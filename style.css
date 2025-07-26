@@ -88,21 +88,6 @@ body {
      object-fit: cover;
      pointer-events: none;
 }
-#video-wall-mute-btn {
-    position: fixed; bottom: 1.5rem; right: 1.5rem;
-    background-color: rgba(255, 255, 255, 0.5);
-    backdrop-filter: blur(8px);
-    padding: 0.75rem;
-    border-radius: 9999px;
-    color: black;
-    transition: all 0.2s;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-    z-index: 50;
-    border: none;
-    cursor: pointer;
-}
-#video-wall-mute-btn:hover { background-color: white; }
-#video-wall-mute-btn.hidden { display: none; }
 
 
 #game-overlay {
@@ -339,7 +324,7 @@ body {
     position: absolute; bottom: 2rem;
     width: 100%; max-width: 500px;
     left: 50%; transform: translateX(-50%);
-    z-index: 101;
+    z-index: 201; /* Raised to appear above game-over screen */
 }
 #chat-input {
     width: 100%; padding: 1rem;

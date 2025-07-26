@@ -28,6 +28,7 @@ const DOMElements = {
     bossName: document.getElementById('boss-name'),
     bossLevel: document.getElementById('boss-level'),
     bossHealthBar: document.getElementById('boss-health-bar'),
+    bossHealthBarContainer: document.getElementById('boss-health-bar-container'),
 };
 
 // --- Game Data ---
@@ -61,7 +62,6 @@ const gameState = {
     sequenceTurnCounter: 0,
     bossName: '',
     bossLevel: 1,
-    bossElement: 'fire',
     bossMaxHealth: 250,
     bossCurrentHealth: 250,
     status: 'setup',
@@ -133,9 +133,16 @@ class Player {
         this.sequenceProgress = 0;
 
         if (!sequence) {
-            if (this.successfulSequences >= 8) this.sequenceLength = Math.floor(Math.random() * 5) + 4;
-            else if (this.successfulSequences >= 3) this.sequenceLength = Math.min(8, this.successfulSequences + 1);
-            else this.sequenceLength = 3;
+            // --- NEW: Challenge sequence logic ---
+            if (this.combo === 9) {
+                this.sequenceLength = 12;
+            } else if (this.successfulSequences >= 8) {
+                this.sequenceLength = Math.floor(Math.random() * 5) + 4;
+            } else if (this.successfulSequences >= 3) {
+                this.sequenceLength = Math.min(8, this.successfulSequences + 1);
+            } else {
+                this.sequenceLength = 3;
+            }
             this.currentSequence = Array.from({ length: this.sequenceLength }, () => ARROW_KEYS[Math.floor(Math.random() * 4)]);
         } else {
             this.currentSequence = sequence;
@@ -376,7 +383,7 @@ function setupConnection() {
                  if (remotePlayer) remotePlayer.updateLives(data.lives);
                 break;
             case 'boss_health_update':
-                updateBossHealth(data.newHealth);
+                updateBossHealth(data.newHealth, data.isHeavy);
                 break;
             case 'boss_action':
                 if (data.action === 'heal') {
@@ -425,7 +432,8 @@ function initBoss(bossState = null) {
     }
     DOMElements.bossName.textContent = gameState.bossName;
     DOMElements.bossLevel.textContent = `Lvl ${gameState.bossLevel}`;
-    DOMElements.bossArea.className = gameState.bossElement;
+    DOMElements.bossArea.className = ''; // Clear previous elements
+    DOMElements.bossArea.classList.add(gameState.bossElement);
     updateBossHealth(gameState.bossCurrentHealth);
 }
 
@@ -443,9 +451,10 @@ function triggerBossAction() {
     if (action === 'heal') {
         DOMElements.bossArea.classList.add('boss-healing');
         setTimeout(() => DOMElements.bossArea.classList.remove('boss-healing'), 1000);
-        applyBossHeal();
+        const newHealth = Math.min(gameState.bossMaxHealth, gameState.bossCurrentHealth + 10);
+        updateBossHealth(newHealth);
         sendData({ type: 'boss_action', action: 'heal' });
-        sendData({ type: 'boss_health_update', newHealth: gameState.bossCurrentHealth });
+        sendData({ type: 'boss_health_update', newHealth: newHealth });
     } else {
         const target = gameState.mode === 'multi' ? (Math.random() < 0.5 ? localPlayer : remotePlayer) : localPlayer;
         if (!target) return;
@@ -454,11 +463,6 @@ function triggerBossAction() {
         applyBossAttack(action, target);
         if(gameState.mode === 'multi') sendData({ type: 'boss_action', action: action, targetId: target.id });
     }
-}
-
-function applyBossHeal() {
-    const newHealth = Math.min(gameState.bossMaxHealth, gameState.bossCurrentHealth + 10);
-    updateBossHealth(newHealth);
 }
 
 function showAttackAnnouncement(attackType, player) {
@@ -504,12 +508,17 @@ function applyBossAttack(attackType, player) {
     }
 }
 
-function dealDamageToBoss(damage) {
+function dealDamageToBoss(damage, player, isHeavyAttack = false) {
     if (gameState.status !== 'playing') return;
-    const newHealth = Math.max(0, gameState.bossCurrentHealth - damage);
-    updateBossHealth(newHealth);
 
-    if (gameState.mode === 'multi') sendData({ type: 'boss_health_update', newHealth: newHealth });
+    // Animate the player's grid to show they are attacking
+    player.dom.grid.classList.add('attack-launch');
+    setTimeout(() => player.dom.grid.classList.remove('attack-launch'), 400);
+
+    const newHealth = Math.max(0, gameState.bossCurrentHealth - damage);
+    updateBossHealth(newHealth, isHeavyAttack);
+
+    if (gameState.mode === 'multi') sendData({ type: 'boss_health_update', newHealth: newHealth, isHeavy: isHeavyAttack });
 
     if (newHealth <= 0) {
         const winner = gameState.mode === 'multi' ? `${localPlayer.name} & ${remotePlayer.name}` : localPlayer.name;
@@ -517,10 +526,28 @@ function dealDamageToBoss(damage) {
     }
 }
 
-function updateBossHealth(health) {
+function updateBossHealth(health, isHeavy = false) {
     gameState.bossCurrentHealth = health;
     const healthPercent = (gameState.bossCurrentHealth / gameState.bossMaxHealth) * 100;
     DOMElements.bossHealthBar.style.width = `${healthPercent}%`;
+
+    // Trigger animations
+    if (isHeavy) {
+        DOMElements.bossHealthBarContainer.classList.add('heavy-shake');
+        
+        const crack = document.createElement('div');
+        crack.className = 'health-crack-effect';
+        DOMElements.bossHealthBarContainer.appendChild(crack);
+
+        setTimeout(() => {
+            DOMElements.bossHealthBarContainer.classList.remove('heavy-shake');
+            crack.remove();
+        }, 500); // Increased duration to match animation
+
+    } else {
+        DOMElements.bossHealthBarContainer.classList.add('jiggle');
+        setTimeout(() => DOMElements.bossHealthBarContainer.classList.remove('jiggle'), 300);
+    }
 }
 
 // --- Core Game Logic ---
@@ -564,14 +591,19 @@ function handleCorrectKeyPress(player) {
         player.successfulSequences++;
         player.updateCombo(player.combo + 1);
 
-        if (gameState.bossMode) {
-            if (player.successfulSequences > 0 && player.successfulSequences % 10 === 0) {
-                dealDamageToBoss(25);
-            }
-        }
-
         player.dom.grid.classList.add('success-glow');
         setTimeout(() => player.dom.grid.classList.remove('success-glow'), 500);
+
+        // --- Boss Damage Logic ---
+        if (gameState.bossMode) {
+            if (player.combo > 0 && player.combo % 10 === 0) {
+                // Heavy Attack every 10 combos
+                dealDamageToBoss(25, player, true);
+            } else {
+                // Standard attack on every success
+                dealDamageToBoss(5, player, false);
+            }
+        }
 
         setTimeout(() => {
             player.startNewSequence();
@@ -654,7 +686,7 @@ function resetGame() {
         localPlayer.startNewSequence();
     } else if (gameState.isHost) {
         localPlayer.startNewSequence();
-        sendData({ type: 'new_sequence', sequence: localPlayer.currentSequence, combo: player.combo });
+        sendData({ type: 'new_sequence', sequence: player.currentSequence, combo: player.combo });
         
         const guestSequence = Array.from({ length: 3 }, () => ARROW_KEYS[Math.floor(Math.random() * 4)]);
         remotePlayer.startNewSequence(guestSequence);

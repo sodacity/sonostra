@@ -146,11 +146,33 @@ class Player {
     }
 
     displaySequence() {
+        const sequenceLength = this.currentSequence.length;
+        let arrowSize = 64; // Default desktop size
+        let arrowGap = 16;  // Default desktop gap
+
+        // Only apply special mobile sizing if the screen is narrow
+        if (window.innerWidth <= 768) {
+            if (sequenceLength >= 8) {
+                arrowSize = 34; // Smallest size for the longest sequences
+                arrowGap = 4;
+            } else if (sequenceLength >= 6) {
+                arrowSize = 42; // Medium size
+                arrowGap = 6;
+            } else { // 5 or fewer arrows
+                arrowSize = 50; // Largest mobile size
+                arrowGap = 8;
+            }
+        }
+        
+        // Apply these sizes as CSS variables.
+        this.dom.sequenceContainer.style.setProperty('--arrow-size', `${arrowSize}px`);
+        this.dom.sequenceContainer.style.setProperty('--arrow-gap', `${arrowGap}px`);
+
+        // Populate the container with the arrows
         this.dom.sequenceContainer.innerHTML = '';
         this.currentSequence.forEach(arrowKey => {
             this.dom.sequenceContainer.innerHTML += ARROW_SVG[arrowKey];
         });
-        this.dom.sequenceContainer.style.transform = `translate(-50%, -50%)`;
     }
 
     startTimer() {
@@ -632,7 +654,7 @@ function resetGame() {
         localPlayer.startNewSequence();
     } else if (gameState.isHost) {
         localPlayer.startNewSequence();
-        sendData({ type: 'new_sequence', sequence: localPlayer.currentSequence, combo: localPlayer.combo });
+        sendData({ type: 'new_sequence', sequence: localPlayer.currentSequence, combo: player.combo });
         
         const guestSequence = Array.from({ length: 3 }, () => ARROW_KEYS[Math.floor(Math.random() * 4)]);
         remotePlayer.startNewSequence(guestSequence);

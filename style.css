@@ -205,14 +205,16 @@ body {
     left: 50%;
     transform: translate(-50%, -50%);
     display: flex;
-    gap: 1rem;
-    transition: transform 0.2s ease-in-out;
+    gap: var(--arrow-gap, 1rem); /* Use variable with fallback */
+    transition: transform 0.2s ease-in-out, gap 0.3s ease-in-out; /* Added gap transition */
     pointer-events: none;
 }
 
 .arrow-icon {
-    width: 64px; height: 64px; opacity: 1;
-    transition: opacity 0.3s, transform 0.3s;
+    width: var(--arrow-size, 64px); /* Use variable with fallback */
+    height: var(--arrow-size, 64px); /* Use variable with fallback */
+    opacity: 1;
+    transition: opacity 0.3s, transform 0.3s, width 0.3s ease-in-out, height 0.3s ease-in-out; /* Added size transition */
     filter: drop-shadow(0 0 5px rgba(0,0,0,0.5));
     pointer-events: none;
 }
@@ -548,6 +550,23 @@ body {
     }
     #boss-name { font-size: 1.5rem; }
     #connection-setup h1 { font-size: 2.5rem; }
+
+    /* Make the grid a flex container to handle centering of the sequence */
+    .game-grid {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    /* Change the sequence container's positioning to be constrained */
+    .sequence-container {
+        position: relative; /* No longer absolute */
+        top: auto;
+        left: auto;
+        transform: none;    /* Remove the transform */
+        max-width: 100%;    /* This is the magic: it cannot overflow! */
+        justify-content: center; /* Ensures arrows are centered within the now-constrained container */
+    }
 
     /* Compact Remote Player View */
     .player-area.is-remote-player {

@@ -146,26 +146,32 @@ class Player {
     }
 
     displaySequence() {
-        // --- START: Added Scaling Logic ---
-        const isMobile = window.innerWidth <= 768;
+        // --- START: New Dynamic Scaling Logic ---
         const sequenceLength = this.currentSequence.length;
-        
-        // Define default sizes for desktop and mobile
-        let arrowSize = isMobile ? 50 : 64; // Base size: 50px for mobile, 64px for desktop
-        let arrowGap = isMobile ? 8 : 16;   // Base gap in pixels (roughly 0.5rem vs 1rem)
 
-        // Only scale down on mobile when the sequence is long
-        if (isMobile && sequenceLength > 5) {
-            // Aggressively scale down size for each arrow after the 5th one
-            // We use Math.max to set a minimum size of 32px so they don't become too tiny
-            arrowSize = Math.max(32, arrowSize - (sequenceLength - 5) * 6);
-            arrowGap = Math.max(2, arrowGap - (sequenceLength - 5) * 2);
-        }
+        // 1. Measure the available width inside the grid container, leaving a little padding.
+        const availableWidth = this.dom.grid.clientWidth - 20;
 
-        // Apply these sizes as CSS variables to the container
+        // 2. We'll define the gap between arrows as a ratio of their size.
+        const gapRatio = 0.2; // A 20% gap looks good.
+
+        // 3. Calculate the ideal arrow size that would make the whole sequence fit.
+        // Formula: availableWidth = (num_arrows * size) + (num_gaps * gap_size)
+        let arrowSize = availableWidth / (sequenceLength + (sequenceLength - 1) * gapRatio);
+
+        // 4. Set maximum and minimum caps to keep arrows from getting too big or too small.
+        const isMobile = window.innerWidth <= 768;
+        const maxSize = isMobile ? 55 : 64;
+        arrowSize = Math.min(arrowSize, maxSize); // Don't let them get bigger than the max size.
+        arrowSize = Math.max(arrowSize, 30);      // Don't let them get smaller than 30px.
+
+        // 5. Calculate the final gap based on the calculated arrow size.
+        const arrowGap = arrowSize * gapRatio;
+
+        // 6. Apply these calculated sizes as CSS variables.
         this.dom.sequenceContainer.style.setProperty('--arrow-size', `${arrowSize}px`);
         this.dom.sequenceContainer.style.setProperty('--arrow-gap', `${arrowGap}px`);
-        // --- END: Added Scaling Logic ---
+        // --- END: New Dynamic Scaling Logic ---
 
         this.dom.sequenceContainer.innerHTML = '';
         this.currentSequence.forEach(arrowKey => {

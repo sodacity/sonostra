@@ -34,11 +34,13 @@ const DOMElements = {
 // --- Game Data ---
 const BOSS_NAMES = ["Sonus", "Tremor", "Siren", "Symphony", "Echo", "Sonoris", "Noctaria", "Legion", "Echolyra", "Stellaria", "Orbisona"];
 const BOSS_ELEMENTS = ["fire", "poison", "ice"];
-const BOSS_ACTIONS = ["timer_burn", "blur", "stealth", "heal"];
+const BOSS_ACTIONS = ["timer_burn", "blur", "stealth", "heal", "seismic_shift", "rhythm_shift"];
 const ATTACK_NAMES = {
     timer_burn: 'TIMER BURN',
     blur: 'DISTORTION FIELD',
-    stealth: 'STEALTH SEQUENCE'
+    stealth: 'STEALTH SEQUENCE',
+    seismic_shift: 'SEISMIC SHIFT',
+    rhythm_shift: 'DECAY'
 };
 const ARROW_SVG = {
     'ArrowUp': `<svg class="arrow-icon" viewBox="0 0 100 100"><path class="arrow-bg" fill="url(#grad-up)" d="M50,0 L100,50 L85,65 L50,30 L15,65 L0,50 Z"></path><path class="arrow-shape" fill="rgba(255,255,255,0.8)" d="M50,15 L80,45 L68,57 L50,39 L32,57 L20,45 Z"></path></svg>`,
@@ -59,6 +61,7 @@ const gameState = {
     isHost: false,
     mode: 'solo',
     bossMode: false,
+    bossIsEnraged: false,
     sequenceTurnCounter: 0,
     bossName: '',
     bossLevel: 1,
@@ -82,6 +85,7 @@ class Player {
         this.sequenceLength = 3;
         this.currentSequence = [];
         this.timerId = null;
+        this.decayActive = false;
 
         this.dom = {
             playerArea: document.getElementById(`player${id}-container`),
@@ -127,14 +131,22 @@ class Player {
 
     startNewSequence(sequence = null) {
         this.dom.sequenceContainer.classList.remove('stealth');
-        this.timeLimit = Math.max(4000, 10000 - (this.successfulSequences * 400));
+        
+        const timerBarContainer = this.dom.timerBar.parentElement;
+        if (this.decayActive) {
+            this.timeLimit = 5000; // Decay/Haste time limit
+            timerBarContainer.classList.add('decay-active');
+            this.decayActive = false; // Consume the decay effect
+        } else {
+            this.timeLimit = Math.max(4000, 10000 - (this.successfulSequences * 400));
+            timerBarContainer.classList.remove('decay-active');
+        }
         
         cancelAnimationFrame(this.timerId);
         this.sequenceProgress = 0;
 
         if (!sequence) {
-            // --- NEW: Challenge sequence logic ---
-            if (this.combo === 9) {
+            if (this.combo > 0 && this.combo % 9 === 0) {
                 this.sequenceLength = 12;
             } else if (this.successfulSequences >= 8) {
                 this.sequenceLength = Math.floor(Math.random() * 5) + 4;
@@ -157,18 +169,24 @@ class Player {
         let arrowSize = 64; // Default desktop size
         let arrowGap = 16;  // Default desktop gap
 
-        // Only apply special mobile sizing if the screen is narrow
+        // Scale on mobile OR if the sequence is long on any screen
         if (window.innerWidth <= 768) {
-            if (sequenceLength >= 8) {
-                arrowSize = 34; // Smallest size for the longest sequences
-                arrowGap = 4;
-            } else if (sequenceLength >= 6) {
-                arrowSize = 42; // Medium size
+             if (sequenceLength >= 11) { // For 11, 12, etc. on mobile
+                arrowSize = 42;
+                arrowGap = 5;
+            } else if (sequenceLength >= 9) { // For 9 and 10 on mobile
+                arrowSize = 48;
                 arrowGap = 6;
-            } else { // 5 or fewer arrows
-                arrowSize = 50; // Largest mobile size
+            } else if (sequenceLength >= 7) { // For 7 and 8 on mobile
+                arrowSize = 54;
                 arrowGap = 8;
+            } else { // 6 or fewer on mobile
+                arrowSize = 60;
+                arrowGap = 10;
             }
+        } else if (sequenceLength > 10) { // For very long sequences on DESKTOP
+            arrowSize = 50;
+            arrowGap = 8;
         }
         
         // Apply these sizes as CSS variables.
@@ -418,6 +436,9 @@ function setupConnection() {
 // --- Boss Functions ---
 function initBoss(bossState = null) {
     DOMElements.bossArea.style.display = 'block';
+    DOMElements.bossArea.classList.remove('enraged'); // Reset enraged visual
+    gameState.bossIsEnraged = false; // Reset enraged state
+
     if (bossState) {
         gameState.bossName = bossState.name;
         gameState.bossLevel = bossState.level;
@@ -440,7 +461,20 @@ function initBoss(bossState = null) {
 function hostCheckBossTrigger() {
     if (!gameState.isHost || !gameState.bossMode || gameState.status !== 'playing') return;
     gameState.sequenceTurnCounter++;
-    if(gameState.sequenceTurnCounter > 0 && gameState.sequenceTurnCounter % 3 === 0) {
+    
+    // Check for high-combo Rhythm Shift trigger
+    if (localPlayer.combo >= 6 && localPlayer.combo < 9 && Math.random() < 0.3) {
+        applyBossAttack('rhythm_shift', localPlayer);
+        return; // Don't do a normal attack this turn
+    }
+    if (remotePlayer && remotePlayer.combo >= 6 && remotePlayer.combo < 9 && Math.random() < 0.3) {
+        applyBossAttack('rhythm_shift', remotePlayer);
+        return;
+    }
+    
+    const triggerInterval = gameState.bossIsEnraged ? 2 : 3; // Attack every 2 turns if enraged
+
+    if(gameState.sequenceTurnCounter > 0 && gameState.sequenceTurnCounter % triggerInterval === 0) {
         triggerBossAction();
     }
 }
@@ -465,10 +499,15 @@ function triggerBossAction() {
     }
 }
 
-function showAttackAnnouncement(attackType, player) {
+function showAttackAnnouncement(attackType, player, isDramatic = false) {
     const attackName = ATTACK_NAMES[attackType];
     if (!attackName || !player) return;
     const container = player.dom.attackAnnouncement;
+
+    if (isDramatic) {
+        container.classList.add('dramatic');
+    }
+
     container.innerHTML = '';
     attackName.split('').forEach((char, index) => {
         const span = document.createElement('span');
@@ -478,20 +517,32 @@ function showAttackAnnouncement(attackType, player) {
         container.appendChild(span);
     });
     container.classList.add('visible');
-    setTimeout(() => container.classList.remove('visible'), 2500);
+    setTimeout(() => {
+        container.classList.remove('visible');
+        if (isDramatic) {
+            container.classList.remove('dramatic');
+        }
+    }, 2500);
 }
 
 function applyBossAttack(attackType, player) {
     if (!player) return;
     
-    showAttackAnnouncement(attackType, player);
+    if (attackType === 'rhythm_shift') {
+        showAttackAnnouncement(attackType, player, true);
+        player.decayActive = true;
+        return;
+    }
+    
+    showAttackAnnouncement(attackType, player, false);
     player.dom.playerArea.classList.add('shake');
     setTimeout(() => player.dom.playerArea.classList.remove('shake'), 500);
 
     switch(attackType) {
         case 'timer_burn':
+            const burnAmount = gameState.bossIsEnraged ? 45 : 30; // More damage when enraged
             const currentWidth = parseFloat(player.dom.timerBar.style.width) || 100;
-            player.dom.timerBar.style.width = `${Math.max(0, currentWidth - 30)}%`;
+            player.dom.timerBar.style.width = `${Math.max(0, currentWidth - burnAmount)}%`;
             const effectEl = player.dom[`timerEffect${gameState.bossElement.charAt(0).toUpperCase() + gameState.bossElement.slice(1)}`];
             if(effectEl) {
                 effectEl.classList.add('visible');
@@ -499,11 +550,16 @@ function applyBossAttack(attackType, player) {
             }
             break;
         case 'blur':
+            const blurDuration = gameState.bossIsEnraged ? 4500 : 3000; // Lasts longer when enraged
             player.dom.grid.classList.add('blurred');
-            setTimeout(() => player.dom.grid.classList.remove('blurred'), 3000);
+            setTimeout(() => player.dom.grid.classList.remove('blurred'), blurDuration);
             break;
         case 'stealth':
             player.dom.sequenceContainer.classList.add('stealth');
+            break;
+        case 'seismic_shift':
+            player.dom.grid.classList.add('grid-tilting');
+            setTimeout(() => player.dom.grid.classList.remove('grid-tilting'), 3000);
             break;
     }
 }
@@ -531,6 +587,12 @@ function updateBossHealth(health, isHeavy = false) {
     const healthPercent = (gameState.bossCurrentHealth / gameState.bossMaxHealth) * 100;
     DOMElements.bossHealthBar.style.width = `${healthPercent}%`;
 
+    // Check for enrage mode
+    if (healthPercent <= 25 && !gameState.bossIsEnraged) {
+        gameState.bossIsEnraged = true;
+        DOMElements.bossArea.classList.add('enraged');
+    }
+
     // Trigger animations
     if (isHeavy) {
         DOMElements.bossHealthBarContainer.classList.add('heavy-shake');
@@ -542,7 +604,7 @@ function updateBossHealth(health, isHeavy = false) {
         setTimeout(() => {
             DOMElements.bossHealthBarContainer.classList.remove('heavy-shake');
             crack.remove();
-        }, 500); // Increased duration to match animation
+        }, 500);
 
     } else {
         DOMElements.bossHealthBarContainer.classList.add('jiggle');
@@ -594,13 +656,10 @@ function handleCorrectKeyPress(player) {
         player.dom.grid.classList.add('success-glow');
         setTimeout(() => player.dom.grid.classList.remove('success-glow'), 500);
 
-        // --- Boss Damage Logic ---
         if (gameState.bossMode) {
             if (player.combo > 0 && player.combo % 10 === 0) {
-                // Heavy Attack every 10 combos
                 dealDamageToBoss(25, player, true);
             } else {
-                // Standard attack on every success
                 dealDamageToBoss(5, player, false);
             }
         }
@@ -656,8 +715,6 @@ function handleRemoteKeyPress(progress) {
     remotePlayer.sequenceProgress = progress;
     const arrowEl = remotePlayer.dom.sequenceContainer.children[progress - 1];
     if (arrowEl) arrowEl.classList.add('correct');
-    const offset = (progress * -74) + 'px';
-    remotePlayer.dom.sequenceContainer.style.transform = `translate(calc(-50% + ${offset}), -50%)`;
 }
 
 function resetGame() {
@@ -669,6 +726,7 @@ function resetGame() {
 
     gameState.status = 'playing';
     gameState.sequenceTurnCounter = 0;
+    gameState.bossIsEnraged = false; // Reset enrage state
     if(gameState.bossMode) {
         initBoss(); // Re-randomize boss for the rematch
     }

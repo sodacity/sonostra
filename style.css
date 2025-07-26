@@ -240,6 +240,13 @@ body {
     100% { box-shadow: 0 0 10px rgba(244, 67, 54, 0.5); }
 }
 
+/* --- Player Attack Animations --- */
+.game-grid.attack-launch { animation: attack-launch 0.4s ease-out; }
+@keyframes attack-launch {
+    50% { box-shadow: 0 0 25px var(--primary-color), 0 0 20px var(--primary-color) inset; }
+}
+
+
 .timer-bar-container { width: 100%; height: 10px; background: rgba(0, 0, 0, 0.3); border-radius: 5px; overflow: hidden; position: relative; }
 .timer-bar {
     width: 100%; height: 100%;
@@ -455,6 +462,8 @@ body {
     border: 2px solid var(--glass-border);
     border-radius: 15px;
     padding: 4px;
+    position: relative; /* Needed for crack effect */
+    overflow: hidden;   /* Needed for crack effect */
 }
 #boss-health-bar {
     width: 100%;
@@ -473,6 +482,39 @@ body {
     50% { transform: translateY(0) scale(1); }
     75% { transform: translateY(-10px) scale(1.03); filter: drop-shadow(0 0 15px var(--success-color)); }
 }
+
+/* --- Boss Health Bar Animations --- */
+#boss-health-bar-container.jiggle { animation: jiggle 0.3s; }
+@keyframes jiggle {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-3px); }
+  50% { transform: translateX(3px); }
+  75% { transform: translateX(-3px); }
+}
+
+#boss-health-bar-container.heavy-shake { animation: heavy-shake 0.5s; }
+@keyframes heavy-shake {
+  0%, 100% { transform: translate(0, 0) rotate(0); }
+  10%, 90% { transform: translate(-8px, 0) rotate(-2deg); }
+  20%, 80% { transform: translate(8px, -4px) rotate(2deg); }
+  30%, 50%, 70% { transform: translate(-8px, 4px) rotate(-1deg); }
+  40%, 60% { transform: translate(8px, 0) rotate(1deg); }
+}
+
+.health-crack-effect {
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    background: linear-gradient(115deg, transparent 48%, rgba(255,255,255,0.7) 50%, transparent 52%);
+    animation: crack-fade 0.4s;
+    opacity: 0;
+}
+@keyframes crack-fade {
+    50% { opacity: 1; }
+}
+
 
 /* --- Boss Attack Effects --- */
 .attack-announcement {

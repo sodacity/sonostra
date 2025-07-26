@@ -4,9 +4,6 @@ const DOMElements = {
     gameArea: document.getElementById('game-area'),
     videoUrlInput: document.getElementById('video-url-input'),
     videoWallContainer: document.getElementById('video-wall-container'),
-    videoWallMuteBtn: document.getElementById('video-wall-mute-btn'),
-    muteIcon: document.getElementById('mute-icon'),
-    unmuteIcon: document.getElementById('unmute-icon'),
     startBtn: document.getElementById('start-btn'),
     joinBtn: document.getElementById('join-btn'),
     gameModeToggle: document.getElementById('game-mode-toggle'),
@@ -69,7 +66,6 @@ const gameState = {
     bossCurrentHealth: 250,
     status: 'setup',
     videoUrl: '',
-    videoMuted: false,
 };
 
 class Player {
@@ -134,7 +130,7 @@ class Player {
         
         const timerBarContainer = this.dom.timerBar.parentElement;
         if (this.decayActive) {
-            this.timeLimit = 5000; // Decay/Haste time limit
+            this.timeLimit = 5000; // Decay time limit
             timerBarContainer.classList.add('decay-active');
             this.decayActive = false; // Consume the decay effect
         } else {
@@ -169,22 +165,22 @@ class Player {
         let arrowSize = 64; // Default desktop size
         let arrowGap = 16;  // Default desktop gap
 
-        // Scale on mobile OR if the sequence is long on any screen
+        // Scale on mobile
         if (window.innerWidth <= 768) {
-             if (sequenceLength >= 11) { // For 11, 12, etc. on mobile
+             if (sequenceLength >= 11) {
                 arrowSize = 42;
                 arrowGap = 5;
-            } else if (sequenceLength >= 9) { // For 9 and 10 on mobile
+            } else if (sequenceLength >= 9) {
                 arrowSize = 48;
                 arrowGap = 6;
-            } else if (sequenceLength >= 7) { // For 7 and 8 on mobile
+            } else if (sequenceLength >= 7) {
                 arrowSize = 54;
                 arrowGap = 8;
-            } else { // 6 or fewer on mobile
+            } else {
                 arrowSize = 60;
                 arrowGap = 10;
             }
-        } else if (sequenceLength > 10) { // For very long sequences on DESKTOP
+        } else if (sequenceLength > 10) { // Scale only if extra long on desktop
             arrowSize = 50;
             arrowGap = 8;
         }
@@ -246,13 +242,6 @@ function setupUIListeners() {
     DOMElements.joinBtn.addEventListener('click', onJoinGameClick);
     DOMElements.videoUrlInput.addEventListener('input', () => {
         gameState.videoUrl = DOMElements.videoUrlInput.value.trim();
-    });
-    DOMElements.videoWallMuteBtn.addEventListener('click', () => {
-         gameState.videoMuted = !gameState.videoMuted;
-         updateVideoMuteState();
-         if (gameState.mode === 'multi' && conn) {
-            sendData({ type: 'video_mute_sync', muted: gameState.videoMuted });
-        }
     });
     DOMElements.chatInput.addEventListener('keydown', handleChat);
     DOMElements.rematchBtn.addEventListener('click', () => {
@@ -351,7 +340,6 @@ function setupConnection() {
                         type: 'initial_state',
                         hostName: localPlayer.name,
                         videoUrl: gameState.videoUrl,
-                        videoMuted: gameState.videoMuted,
                         bossState: gameState.bossMode ? {
                             name: gameState.bossName,
                             level: gameState.bossLevel,
@@ -364,7 +352,6 @@ function setupConnection() {
                         localPlayer.startNewSequence();
                         sendData({ type: 'new_sequence', sequence: localPlayer.currentSequence, combo: localPlayer.combo });
                         
-                        // Always send a starting sequence to the guest in multiplayer
                         const guestSequence = Array.from({ length: 3 }, () => ARROW_KEYS[Math.floor(Math.random() * 4)]);
                         remotePlayer.startNewSequence(guestSequence);
                         sendData({ type: 'start_game', sequence: guestSequence });
@@ -379,7 +366,6 @@ function setupConnection() {
                 remotePlayer = new Player(1, data.hostName, false);
                 remotePlayer.dom.playerArea.classList.add('is-remote-player');
                 gameState.videoUrl = data.videoUrl;
-                gameState.videoMuted = data.videoMuted;
                 setVideoBackground();
                 break;
             case 'start_game':
@@ -425,10 +411,6 @@ function setupConnection() {
             case 'chat':
                 addChatMessage(data.message, 'theirs');
                 break;
-            case 'video_mute_sync':
-                gameState.videoMuted = data.muted;
-                updateVideoMuteState();
-                break;
         }
     });
 }
@@ -436,8 +418,8 @@ function setupConnection() {
 // --- Boss Functions ---
 function initBoss(bossState = null) {
     DOMElements.bossArea.style.display = 'block';
-    DOMElements.bossArea.classList.remove('enraged'); // Reset enraged visual
-    gameState.bossIsEnraged = false; // Reset enraged state
+    DOMElements.bossArea.classList.remove('enraged');
+    gameState.bossIsEnraged = false;
 
     if (bossState) {
         gameState.bossName = bossState.name;
@@ -453,7 +435,7 @@ function initBoss(bossState = null) {
     }
     DOMElements.bossName.textContent = gameState.bossName;
     DOMElements.bossLevel.textContent = `Lvl ${gameState.bossLevel}`;
-    DOMElements.bossArea.className = ''; // Clear previous elements
+    DOMElements.bossArea.className = '';
     DOMElements.bossArea.classList.add(gameState.bossElement);
     updateBossHealth(gameState.bossCurrentHealth);
 }
@@ -462,17 +444,16 @@ function hostCheckBossTrigger() {
     if (!gameState.isHost || !gameState.bossMode || gameState.status !== 'playing') return;
     gameState.sequenceTurnCounter++;
     
-    // Check for high-combo Rhythm Shift trigger
     if (localPlayer.combo >= 6 && localPlayer.combo < 9 && Math.random() < 0.3) {
         applyBossAttack('rhythm_shift', localPlayer);
-        return; // Don't do a normal attack this turn
+        return;
     }
     if (remotePlayer && remotePlayer.combo >= 6 && remotePlayer.combo < 9 && Math.random() < 0.3) {
         applyBossAttack('rhythm_shift', remotePlayer);
         return;
     }
     
-    const triggerInterval = gameState.bossIsEnraged ? 2 : 3; // Attack every 2 turns if enraged
+    const triggerInterval = gameState.bossIsEnraged ? 2 : 3;
 
     if(gameState.sequenceTurnCounter > 0 && gameState.sequenceTurnCounter % triggerInterval === 0) {
         triggerBossAction();
@@ -540,7 +521,7 @@ function applyBossAttack(attackType, player) {
 
     switch(attackType) {
         case 'timer_burn':
-            const burnAmount = gameState.bossIsEnraged ? 45 : 30; // More damage when enraged
+            const burnAmount = gameState.bossIsEnraged ? 45 : 30;
             const currentWidth = parseFloat(player.dom.timerBar.style.width) || 100;
             player.dom.timerBar.style.width = `${Math.max(0, currentWidth - burnAmount)}%`;
             const effectEl = player.dom[`timerEffect${gameState.bossElement.charAt(0).toUpperCase() + gameState.bossElement.slice(1)}`];
@@ -550,7 +531,7 @@ function applyBossAttack(attackType, player) {
             }
             break;
         case 'blur':
-            const blurDuration = gameState.bossIsEnraged ? 4500 : 3000; // Lasts longer when enraged
+            const blurDuration = gameState.bossIsEnraged ? 4500 : 3000;
             player.dom.grid.classList.add('blurred');
             setTimeout(() => player.dom.grid.classList.remove('blurred'), blurDuration);
             break;
@@ -567,7 +548,6 @@ function applyBossAttack(attackType, player) {
 function dealDamageToBoss(damage, player, isHeavyAttack = false) {
     if (gameState.status !== 'playing') return;
 
-    // Animate the player's grid to show they are attacking
     player.dom.grid.classList.add('attack-launch');
     setTimeout(() => player.dom.grid.classList.remove('attack-launch'), 400);
 
@@ -587,13 +567,11 @@ function updateBossHealth(health, isHeavy = false) {
     const healthPercent = (gameState.bossCurrentHealth / gameState.bossMaxHealth) * 100;
     DOMElements.bossHealthBar.style.width = `${healthPercent}%`;
 
-    // Check for enrage mode
     if (healthPercent <= 25 && !gameState.bossIsEnraged) {
         gameState.bossIsEnraged = true;
         DOMElements.bossArea.classList.add('enraged');
     }
 
-    // Trigger animations
     if (isHeavy) {
         DOMElements.bossHealthBarContainer.classList.add('heavy-shake');
         
@@ -624,7 +602,7 @@ function transitionToGameArea() {
 
 function handleKeyPress(e) {
     if (gameState.status === 'gameover' || titleScreenActive) return;
-    const key = e.key || e; // Allow string to be passed directly
+    const key = e.key || e;
     if (!ARROW_KEYS.includes(key)) return;
     
     if (gameState.status === 'setup') gameState.status = 'playing';
@@ -669,7 +647,7 @@ function handleCorrectKeyPress(player) {
             if (gameState.mode === 'multi') {
                 sendData({ type: 'new_sequence', sequence: player.currentSequence, combo: player.combo });
             } else {
-                hostCheckBossTrigger(); // Call for solo player
+                hostCheckBossTrigger();
             }
         }, 300);
     }
@@ -704,7 +682,7 @@ function handleFailure(player) {
             if (gameState.mode === 'multi') {
                 sendData({ type: 'new_sequence', sequence: player.currentSequence, combo: player.combo });
             } else {
-                hostCheckBossTrigger(); // Call for solo player
+                hostCheckBossTrigger();
             }
         }, 300);
     }
@@ -726,9 +704,9 @@ function resetGame() {
 
     gameState.status = 'playing';
     gameState.sequenceTurnCounter = 0;
-    gameState.bossIsEnraged = false; // Reset enrage state
+    gameState.bossIsEnraged = false;
     if(gameState.bossMode) {
-        initBoss(); // Re-randomize boss for the rematch
+        initBoss();
     }
 
     localPlayer.updateLives(3);
@@ -744,7 +722,7 @@ function resetGame() {
         localPlayer.startNewSequence();
     } else if (gameState.isHost) {
         localPlayer.startNewSequence();
-        sendData({ type: 'new_sequence', sequence: player.currentSequence, combo: player.combo });
+        sendData({ type: 'new_sequence', sequence: localPlayer.currentSequence, combo: player.combo });
         
         const guestSequence = Array.from({ length: 3 }, () => ARROW_KEYS[Math.floor(Math.random() * 4)]);
         remotePlayer.startNewSequence(guestSequence);
@@ -800,12 +778,12 @@ function handleTouchEnd(evt) {
     let swipeDirection = '';
     if (Math.abs(diffX) > Math.abs(diffY)) {
         // Horizontal swipe
-        if (Math.abs(diffX) > 30) { // Minimum swipe distance
+        if (Math.abs(diffX) > 30) {
             swipeDirection = diffX > 0 ? 'ArrowRight' : 'ArrowLeft';
         }
     } else {
         // Vertical swipe
-        if (Math.abs(diffY) > 30) { // Minimum swipe distance
+        if (Math.abs(diffY) > 30) {
             swipeDirection = diffY > 0 ? 'ArrowDown' : 'ArrowUp';
         }
     }
@@ -824,7 +802,6 @@ function setVideoBackground() {
     const url = gameState.videoUrl;
     DOMElements.videoWallContainer.innerHTML = '';
     if (!url) {
-        DOMElements.videoWallMuteBtn.classList.add('hidden');
         return;
     }
 
@@ -832,8 +809,7 @@ function setVideoBackground() {
 
     if (youtubeIdMatch && youtubeIdMatch[1]) {
         const videoId = youtubeIdMatch[1];
-        const muteParam = gameState.videoMuted ? 1 : 0;
-        const embedUrl = `https://www.youtube-nocookie.com/embed/${videoId}?autoplay=1&mute=${muteParam}&loop=1&playlist=${videoId}&controls=0&showinfo=0&autohide=1&modestbranding=1&iv_load_policy=3`;
+        const embedUrl = `https://www.youtube-nocookie.com/embed/${videoId}?autoplay=1&mute=0&loop=1&playlist=${videoId}&controls=0&showinfo=0&autohide=1&modestbranding=1&iv_load_policy=3`;
         const iframe = document.createElement('iframe');
         iframe.src = embedUrl;
         iframe.setAttribute('frameborder', '0');
@@ -843,29 +819,14 @@ function setVideoBackground() {
         const videoEl = document.createElement('video');
         videoEl.src = url;
         videoEl.autoplay = true;
-        videoEl.muted = gameState.videoMuted;
+        videoEl.muted = false;
         videoEl.loop = true;
         videoEl.playsInline = true;
-        if(!gameState.videoMuted) videoEl.volume = 1.0;
+        videoEl.volume = 1.0;
         DOMElements.videoWallContainer.appendChild(videoEl);
     }
 
     DOMElements.videoWallContainer.insertAdjacentHTML('beforeend', '<div class="overlay"></div>');
-    DOMElements.videoWallMuteBtn.classList.remove('hidden');
-    updateVideoMuteState();
-}
-
-function updateVideoMuteState() {
-    if (gameState.videoMuted) {
-        DOMElements.muteIcon.classList.remove('hidden');
-        DOMElements.unmuteIcon.classList.add('hidden');
-    } else {
-        DOMElements.muteIcon.classList.add('hidden');
-        DOMElements.unmuteIcon.classList.remove('hidden');
-    }
-    if(gameState.status !== 'setup') {
-        setVideoBackground();
-    }
 }
 
 function handleChat(e) {

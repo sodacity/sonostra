@@ -31,7 +31,7 @@ const DOMElements = {
 };
 
 // --- Game Data ---
-const BOSS_NAMES = ["Gigavolt", "Syntax Terror", "General Glitch", "The Audiofiend", "Hex Eviscerator"];
+const BOSS_NAMES = ["Sonus", "Tremor", "Siren", "Symphony", "Echo", "Sonoris", "Noctaria", "Legion", "Echolyra", "Stellaria", "Orbisona"];
 const BOSS_ELEMENTS = ["fire", "poison", "ice"];
 const BOSS_ACTIONS = ["timer_burn", "blur", "stealth", "heal"];
 const ATTACK_NAMES = {

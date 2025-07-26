@@ -11,7 +11,6 @@
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <!-- Gradient definitions for SVG icons -->
     <svg width="0" height="0" style="position:absolute">
         <defs>
             <linearGradient id="grad-up" x1="0%" y1="100%" x2="0%" y2="0%"><stop offset="0%" style="stop-color:#2979FF;stop-opacity:1" /><stop offset="100%" style="stop-color:#82B1FF;stop-opacity:1" /></linearGradient>
@@ -22,22 +21,18 @@
         </defs>
     </svg>
 
-    <!-- New Title Screen -->
     <div id="title-screen">
         <h1 class="title-main">Sonostra</h1>
         <p id="press-start-text">Press Any Key or Click to Start</p>
     </div>
 
-    <!-- Video Background Container -->
     <div id="video-wall-container"></div>
     <button id="video-wall-mute-btn" class="hidden">
         <svg id="unmute-icon" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path><path d="M19.07 4.93a10 10 0 0 1 0 14.14"></path></svg>
         <svg id="mute-icon" class="hidden" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><line x1="23" y1="9" x2="17" y2="15"></line><line x1="17" y1="9" x2="23" y2="15"></line></svg>
     </button>
 
-    <!-- Main Game Overlay -->
     <div id="game-overlay">
-        <!-- Connection/Setup Screen -->
         <div id="connection-setup" class="glass-card">
             <h1>Sonostra</h1>
             <div class="input-group">
@@ -66,7 +61,6 @@
             </div>
         </div>
 
-        <!-- In-Game Area -->
         <div id="game-area">
             <div id="boss-area" style="display: none;">
                 <div id="boss-info">
@@ -122,7 +116,6 @@
         </div>
     </div>
 
-    <!-- Chat UI -->
     <div id="popup-chat-container">
         <div id="chat-bubbles"></div>
     </div>
@@ -130,7 +123,6 @@
         <input type="text" id="chat-input" placeholder="Type a message...">
     </div>
 
-    <!-- Game Over Screen -->
     <div id="game-over-screen">
         <div id="game-over-content">
             <h2 id="game-over-title"></h2>

@@ -146,38 +146,33 @@ class Player {
     }
 
     displaySequence() {
-        // --- START: New Dynamic Scaling Logic ---
         const sequenceLength = this.currentSequence.length;
+        let arrowSize = 64; // Default desktop size
+        let arrowGap = 16;  // Default desktop gap
 
-        // 1. Measure the available width inside the grid container, leaving a little padding.
-        const availableWidth = this.dom.grid.clientWidth - 20;
-
-        // 2. We'll define the gap between arrows as a ratio of their size.
-        const gapRatio = 0.2; // A 20% gap looks good.
-
-        // 3. Calculate the ideal arrow size that would make the whole sequence fit.
-        // Formula: availableWidth = (num_arrows * size) + (num_gaps * gap_size)
-        let arrowSize = availableWidth / (sequenceLength + (sequenceLength - 1) * gapRatio);
-
-        // 4. Set maximum and minimum caps to keep arrows from getting too big or too small.
-        const isMobile = window.innerWidth <= 768;
-        const maxSize = isMobile ? 55 : 64;
-        arrowSize = Math.min(arrowSize, maxSize); // Don't let them get bigger than the max size.
-        arrowSize = Math.max(arrowSize, 30);      // Don't let them get smaller than 30px.
-
-        // 5. Calculate the final gap based on the calculated arrow size.
-        const arrowGap = arrowSize * gapRatio;
-
-        // 6. Apply these calculated sizes as CSS variables.
+        // Only apply special mobile sizing if the screen is narrow
+        if (window.innerWidth <= 768) {
+            if (sequenceLength >= 8) {
+                arrowSize = 34; // Smallest size for the longest sequences
+                arrowGap = 4;
+            } else if (sequenceLength >= 6) {
+                arrowSize = 42; // Medium size
+                arrowGap = 6;
+            } else { // 5 or fewer arrows
+                arrowSize = 50; // Largest mobile size
+                arrowGap = 8;
+            }
+        }
+        
+        // Apply these sizes as CSS variables.
         this.dom.sequenceContainer.style.setProperty('--arrow-size', `${arrowSize}px`);
         this.dom.sequenceContainer.style.setProperty('--arrow-gap', `${arrowGap}px`);
-        // --- END: New Dynamic Scaling Logic ---
 
+        // Populate the container with the arrows
         this.dom.sequenceContainer.innerHTML = '';
         this.currentSequence.forEach(arrowKey => {
             this.dom.sequenceContainer.innerHTML += ARROW_SVG[arrowKey];
         });
-        this.dom.sequenceContainer.style.transform = `translate(-50%, -50%)`;
     }
 
     startTimer() {
@@ -659,7 +654,7 @@ function resetGame() {
         localPlayer.startNewSequence();
     } else if (gameState.isHost) {
         localPlayer.startNewSequence();
-        sendData({ type: 'new_sequence', sequence: localPlayer.currentSequence, combo: localPlayer.combo });
+        sendData({ type: 'new_sequence', sequence: localPlayer.currentSequence, combo: player.combo });
         
         const guestSequence = Array.from({ length: 3 }, () => ARROW_KEYS[Math.floor(Math.random() * 4)]);
         remotePlayer.startNewSequence(guestSequence);

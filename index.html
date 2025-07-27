@@ -124,12 +124,34 @@
     </div>
     <div id="chat-input-container" style="display: none;">
         <input type="text" id="chat-input" placeholder="Type a message...">
+        <button id="chat-send-btn" class="btn btn-secondary">Send</button>
     </div>
 
     <div id="game-over-screen">
         <div id="game-over-content">
             <h2 id="game-over-title"></h2>
             <p id="winner-name-display"></p>
+            
+            <div id="post-game-stats">
+                <div class="stat-item">
+                    <span class="stat-label">Highest Combo</span>
+                    <span id="stats-combo" class="stat-value">0</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">Sequences Cleared</span>
+                    <span id="stats-cleared" class="stat-value">0</span>
+                </div>
+                <div class="stat-item" id="damage-stat-container">
+                    <span class="stat-label">Damage Dealt</span>
+                    <span id="stats-damage" class="stat-value">0</span>
+                </div>
+            </div>
+    
+            <div id="next-video-section">
+                <input type="text" id="next-video-input" placeholder="Next YouTube/Video URL...">
+                <button id="change-video-btn" class="btn btn-secondary">Update Video</button>
+            </div>
+    
             <button id="rematch-btn" class="btn btn-primary">Rematch</button>
         </div>
     </div>

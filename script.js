@@ -15,6 +15,7 @@ const DOMElements = {
     roomNameInput: document.getElementById('room-name-input'),
     chatContainer: document.getElementById('popup-chat-container'),
     chatInput: document.getElementById('chat-input'),
+    chatSendBtn: document.getElementById('chat-send-btn'),
     chatBubbles: document.getElementById('chat-bubbles'),
     chatInputContainer: document.getElementById('chat-input-container'),
     gameOverScreen: document.getElementById('game-over-screen'),
@@ -29,6 +30,12 @@ const DOMElements = {
     fullscreenBtn: document.getElementById('fullscreen-btn'),
     fullscreenIcon: document.getElementById('fullscreen-icon'),
     exitFullscreenIcon: document.getElementById('exit-fullscreen-icon'),
+    statsCombo: document.getElementById('stats-combo'),
+    statsCleared: document.getElementById('stats-cleared'),
+    statsDamage: document.getElementById('stats-damage'),
+    damageStatContainer: document.getElementById('damage-stat-container'),
+    nextVideoInput: document.getElementById('next-video-input'),
+    changeVideoBtn: document.getElementById('change-video-btn'),
 };
 
 // --- Game Data ---
@@ -85,6 +92,8 @@ class Player {
         this.currentSequence = [];
         this.timerId = null;
         this.decayActive = false;
+        this.highestCombo = 0;
+        this.damageDealt = 0;
 
         this.dom = {
             playerArea: document.getElementById(`player${id}-container`),
@@ -118,6 +127,7 @@ class Player {
 
     updateCombo(combo) {
         this.combo = combo;
+        this.highestCombo = Math.max(this.highestCombo, this.combo);
         this.dom.comboCount.textContent = this.combo;
         if (this.combo > 0) {
             this.dom.comboContainer.classList.add('visible');
@@ -218,7 +228,6 @@ function init() {
     setupTitleScreenListeners();
     setupUIListeners();
 
-    // Register Service Worker for PWA
     if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
             navigator.serviceWorker.register('/sw.js').then(registration => {
@@ -254,12 +263,26 @@ function setupUIListeners() {
     DOMElements.videoUrlInput.addEventListener('input', () => {
         gameState.videoUrl = DOMElements.videoUrlInput.value.trim();
     });
-    DOMElements.chatInput.addEventListener('keydown', handleChat);
+    DOMElements.chatInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+            sendChatMessage();
+        }
+    });
+    DOMElements.chatSendBtn.addEventListener('click', sendChatMessage);
     DOMElements.rematchBtn.addEventListener('click', () => {
         if (gameState.mode === 'multi') sendData({ type: 'rematch' });
         resetGame();
     });
     DOMElements.fullscreenBtn.addEventListener('click', toggleFullScreen);
+    DOMElements.changeVideoBtn.addEventListener('click', () => {
+        const newUrl = DOMElements.nextVideoInput.value.trim();
+        if (newUrl) {
+            gameState.videoUrl = newUrl;
+            DOMElements.videoUrlInput.value = newUrl;
+            setVideoBackground();
+            DOMElements.nextVideoInput.value = '';
+        }
+    });
     document.addEventListener('fullscreenchange', updateFullscreenIcons);
     window.addEventListener('keydown', handleKeyPress);
     handleGameModeChange();
@@ -561,6 +584,7 @@ function applyBossAttack(attackType, player) {
 function dealDamageToBoss(damage, player, isHeavyAttack = false) {
     if (gameState.status !== 'playing') return;
 
+    player.damageDealt += damage;
     player.dom.grid.classList.add('attack-launch');
     setTimeout(() => player.dom.grid.classList.remove('attack-launch'), 400);
 
@@ -609,7 +633,7 @@ function transitionToGameArea() {
     DOMElements.connectionSetup.style.display = 'none';
     DOMElements.gameArea.style.display = 'flex';
     if (gameState.mode === 'multi') {
-        DOMElements.chatInputContainer.style.display = 'block';
+        DOMElements.chatInputContainer.style.display = 'flex';
     }
 }
 
@@ -722,14 +746,15 @@ function resetGame() {
         initBoss();
     }
 
-    localPlayer.updateLives(3);
-    localPlayer.updateCombo(0);
-    localPlayer.successfulSequences = 0;
-    if (remotePlayer) {
-        remotePlayer.updateLives(3);
-        remotePlayer.updateCombo(0);
-        remotePlayer.successfulSequences = 0;
-    }
+    [localPlayer, remotePlayer].forEach(p => {
+        if (p) {
+            p.updateLives(3);
+            p.updateCombo(0);
+            p.successfulSequences = 0;
+            p.highestCombo = 0;
+            p.damageDealt = 0;
+        }
+    });
 
     if (gameState.mode === 'solo') {
         localPlayer.startNewSequence();
@@ -765,6 +790,16 @@ function gameOver(winnerName) {
     } else {
         DOMElements.winnerNameDisplay.style.display = 'none';
     }
+
+    // Display Stats
+    DOMElements.statsCombo.textContent = localPlayer.highestCombo;
+    DOMElements.statsCleared.textContent = localPlayer.successfulSequences;
+    if (gameState.bossMode) {
+        DOMElements.damageStatContainer.style.display = 'block';
+        DOMElements.statsDamage.textContent = localPlayer.damageDealt;
+    } else {
+        DOMElements.damageStatContainer.style.display = 'none';
+    }
     
     DOMElements.gameOverScreen.classList.add('visible');
 }
@@ -788,6 +823,15 @@ function updateFullscreenIcons() {
     } else {
         DOMElements.fullscreenIcon.classList.remove('hidden');
         DOMElements.exitFullscreenIcon.classList.add('hidden');
+    }
+}
+
+function sendChatMessage() {
+    if (DOMElements.chatInput.value.trim() !== '') {
+        const message = DOMElements.chatInput.value.trim();
+        addChatMessage(message, 'mine');
+        sendData({ type: 'chat', message: message });
+        DOMElements.chatInput.value = '';
     }
 }
 
@@ -862,15 +906,6 @@ function setVideoBackground() {
     }
 
     DOMElements.videoWallContainer.insertAdjacentHTML('beforeend', '<div class="overlay"></div>');
-}
-
-function handleChat(e) {
-    if (e.key === 'Enter' && DOMElements.chatInput.value.trim() !== '') {
-        const message = DOMElements.chatInput.value.trim();
-        addChatMessage(message, 'mine');
-        sendData({ type: 'chat', message: message });
-        DOMElements.chatInput.value = '';
-    }
 }
 
 function addChatMessage(message, type) {

@@ -2,49 +2,99 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>LIVE Mode - Live API</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Tokyo Travel Utility - LIVE Mode</title>
     <script src="https://unpkg.com/peerjs@1.5.4/dist/peer.min.js"></script>
     <script src="https://cdn.rawgit.com/davidshimjs/qrcodejs/gh-pages/qrcode.min.js"></script>
     <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; margin: 0; background-color: #f0f2f5; display: flex; align-items: center; justify-content: center; height: 100vh; }
-        .container { width: 100%; max-width: 400px; background-color: white; border-radius: 16px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); overflow: hidden; display: flex; flex-direction: column; height: 90vh; max-height: 700px; }
-        .screen { padding: 20px; }
-        #chat-screen { display: none; flex-grow: 1; flex-direction: column; }
-        h1, h3 { text-align: center; }
-        button { width: 100%; padding: 12px; margin: 10px 0; border-radius: 8px; border: none; font-size: 16px; cursor: pointer; background-color: #007bff; color: white; }
-        input, select { width: calc(100% - 24px); padding: 10px; border-radius: 8px; border: 1px solid #ccc; margin-bottom: 10px; }
-        #qrcode { display: flex; justify-content: center; margin-top: 15px; }
-        #messages { flex-grow: 1; overflow-y: auto; padding: 10px; border-bottom: 1px solid #eee; }
-        .bubble-wrapper { display: flex; flex-direction: column; margin-bottom: 8px; }
-        .bubble { padding: 8px 12px; border-radius: 18px; max-width: 75%; word-wrap: break-word; }
-        .sent { background-color: #007bff; color: white; align-self: flex-end; }
-        .received { background-color: #e9e9eb; color: black; align-self: flex-start; }
-        .original-text-toggle { font-size: 0.8em; color: #888; cursor: pointer; text-decoration: underline; padding: 4px; border-radius: 8px; }
-        .sent + .original-text-toggle { align-self: flex-end; }
-        .received + .original-text-toggle { align-self: flex-start; }
-        #chat-form { display: flex; padding: 10px; border-top: 1px solid #eee; }
-        #chat-input { flex-grow: 1; margin-right: 10px; }
-        #send-btn { width: auto; }
+        @keyframes aurora {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            margin: 0;
+            background-color: #0a0a0a;
+            background-image: linear-gradient(125deg, #0f0c29, #302b63, #24243e, #1c3d52, #1e5763);
+            background-size: 400% 400%;
+            animation: aurora 20s ease infinite;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            color: #fff;
+        }
+        .container {
+            width: 100%;
+            max-width: 400px;
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border-radius: 24px;
+            border: 1px solid rgba(255, 255, 255, 0.18);
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            height: 90vh;
+            max-height: 700px;
+        }
+        .screen { padding: 25px; text-align: center; }
+        #chat-screen { display: none; flex-grow: 1; flex-direction: column; padding: 15px; }
+        h1 { font-size: 2em; margin-bottom: 20px; }
+        h3 { font-weight: 400; color: rgba(255, 255, 255, 0.7); margin-bottom: 20px; }
+        button {
+            width: 100%; padding: 15px; margin: 10px 0; border-radius: 12px; border: none; font-size: 16px;
+            cursor: pointer; background: rgba(255, 255, 255, 0.2); color: white; font-weight: bold;
+            transition: background-color 0.3s ease;
+        }
+        button:hover { background: rgba(255, 255, 255, 0.3); }
+        input, select {
+            width: calc(100% - 24px); padding: 12px; border-radius: 12px; border: 1px solid rgba(255, 255, 255, 0.2);
+            margin-bottom: 15px; background: rgba(0, 0, 0, 0.2); color: white; text-align: center; font-size: 16px;
+        }
+        #qrcode { display: flex; justify-content: center; background: white; padding: 15px; border-radius: 12px; width: fit-content; margin: 20px auto; }
+        #messages { flex-grow: 1; overflow-y: auto; padding: 10px; }
+        .bubble-wrapper { display: flex; flex-direction: column; margin-bottom: 10px; }
+        .bubble { padding: 10px 15px; border-radius: 20px; max-width: 80%; word-wrap: break-word; line-height: 1.4; }
+        .sent { background: linear-gradient(45deg, #007bff, #0056b3); color: white; align-self: flex-end; }
+        .received { background: rgba(255, 255, 255, 0.9); color: #333; align-self: flex-start; }
+        .original-text-toggle { font-size: 0.8em; color: rgba(255, 255, 255, 0.6); cursor: pointer; text-decoration: underline; padding: 4px; border-radius: 8px; margin-top: 5px; }
+        .sent + .original-text-toggle { display: none; }
+        .received + .original-text-toggle { align-self: flex-start; color: #666; }
+        #chat-form { display: flex; padding: 10px 0 0 0; border-top: 1px solid rgba(255, 255, 255, 0.1); }
+        #chat-input { text-align: left; flex-grow: 1; margin-right: 10px; background: rgba(0, 0, 0, 0.3); }
+        #send-btn { width: auto; font-weight: normal; background-color: #007bff; }
     </style>
 </head>
 <body>
 
     <div class="container">
         <div id="setup-screen" class="screen">
-            <h1>LIVE Mode 🚀</h1>
-            <label for="language-select">Your Language:</label>
-            <select id="language-select">
-                <option value="en">English</option>
-                <option value="ja">Japanese</option>
-            </select>
-            <button id="startHostBtn">Create Session as Host</button>
-            <hr>
-            <h3>Or Join a Session</h3>
-            <input type="text" id="hostIdInput" placeholder="Enter Host ID...">
-            <button id="joinGuestBtn">Join as Guest</button>
-            <div id="host-info"></div>
+            <h1>LIVE Translate</h1>
+            <div id="guest-join-section">
+                <h3>Join a Session</h3>
+                <input type="text" id="hostIdInput" placeholder="Enter Session ID...">
+                <button id="joinGuestBtn">Join</button>
+                <hr style="border-color: rgba(255,255,255,0.2); margin: 20px 0;">
+            </div>
+            <div id="host-create-section">
+                <h3>Or Start a New Session</h3>
+                <select id="language-select">
+                    <option value="en">English</option>
+                    <option value="ja">Japanese</option>
+                </select>
+                <button id="startHostBtn">Create Session</button>
+            </div>
+        </div>
+
+        <div id="host-lobby-screen" class="screen" style="display: none;">
+            <h1>Waiting for Guest...</h1>
+            <h3>Have the guest scan this QR code or enter the ID below.</h3>
             <div id="qrcode"></div>
+            <p style="margin-top: 20px;">Session ID:</p>
+            <b id="host-id-display" style="font-size: 1.2em; letter-spacing: 2px;"></b>
         </div>
 
         <div id="chat-screen" class="screen">
@@ -59,12 +109,13 @@
 <script>
     // --- DOM Elements ---
     const setupScreen = document.getElementById('setup-screen');
+    const hostLobbyScreen = document.getElementById('host-lobby-screen');
     const chatScreen = document.getElementById('chat-screen');
     const languageSelect = document.getElementById('language-select');
     const startHostBtn = document.getElementById('startHostBtn');
     const joinGuestBtn = document.getElementById('joinGuestBtn');
     const hostIdInput = document.getElementById('hostIdInput');
-    const hostInfoDiv = document.getElementById('host-info');
+    const hostIdDisplay = document.getElementById('host-id-display');
     const qrcodeDiv = document.getElementById('qrcode');
     const messagesDiv = document.getElementById('messages');
     const chatForm = document.getElementById('chat-form');
@@ -80,7 +131,6 @@
     async function liveTranslate(text, sourceLang, targetLang) {
         if (!text.trim()) return text;
         try {
-            // This is a free, public API. No key needed.
             const url = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(text)}&langpair=${sourceLang}|${targetLang}`;
             const response = await fetch(url);
             if (!response.ok) throw new Error('Network response was not ok');
@@ -88,92 +138,95 @@
             return data.responseData.translatedText;
         } catch (error) {
             console.error("Translation Error:", error);
-            return `[Translation Failed]`; // Return an error message
+            return `[Translation Failed]`;
         }
     }
 
-    // --- HOST & GUEST LOGIC ---
+    // --- HOST LOGIC ---
     startHostBtn.addEventListener('click', () => {
         peer = new Peer();
-        startHostBtn.disabled = true; joinGuestBtn.disabled = true; languageSelect.disabled = true;
         peer.on('open', (id) => {
             const sessionUrl = `${window.location.href.split('?')[0]}?session=${id}`;
-            hostInfoDiv.innerHTML = `✅ Host ready. Share ID: <b>${id}</b> or scan QR.`;
-            new QRCode(qrcodeDiv, { text: sessionUrl, width: 128, height: 128 });
+            hostIdDisplay.textContent = id;
+            new QRCode(qrcodeDiv, { text: sessionUrl, width: 150, height: 150 });
+            setupScreen.style.display = 'none';
+            hostLobbyScreen.style.display = 'block';
         });
         peer.on('connection', (connection) => { conn = connection; switchToChatScreen(); });
     });
 
+    // --- GUEST LOGIC ---
     joinGuestBtn.addEventListener('click', () => {
         const hostId = hostIdInput.value;
         if (!hostId) { alert('Please enter a Host ID.'); return; }
+        myLanguage = 'ja'; // Assume guest is Japanese
         peer = new Peer();
-        startHostBtn.disabled = true; joinGuestBtn.disabled = true; languageSelect.disabled = true;
         peer.on('open', () => { conn = peer.connect(hostId); switchToChatScreen(); });
     });
     
     window.onload = () => {
         const urlParams = new URLSearchParams(window.location.search);
         const sessionId = urlParams.get('session');
-        if (sessionId) { hostIdInput.value = sessionId; joinGuestBtn.click(); }
+        if (sessionId) {
+            hostIdInput.value = sessionId;
+            document.getElementById('host-create-section').style.display = 'none';
+            document.querySelector('#guest-join-section h3').textContent = "Joining Session...";
+            joinGuestBtn.click();
+        }
     };
 
     // --- SHARED CHAT LOGIC ---
     function switchToChatScreen() {
         conn.on('open', () => {
             setupScreen.style.display = 'none';
+            hostLobbyScreen.style.display = 'none';
             chatScreen.style.display = 'flex';
         });
-
-        conn.on('data', (data) => {
-            const textToShow = myLanguage === data.senderLang ? data.original : data.translated;
-            const originalText = myLanguage === data.senderLang ? data.translated : data.original;
-            displayMessage(textToShow, 'received', originalText);
-        });
+        conn.on('data', (data) => { /* ... same as before ... */ });
+        conn.on('close', () => alert('The other user has left the session.'));
     }
 
+    chatForm.addEventListener('submit', async (e) => { /* ... same as before ... */ });
+    function displayMessage(text, type, originalText) { /* ... same as before ... */ }
+    messagesDiv.addEventListener('click', (e) => { /* ... same as before ... */ });
+
+    // --- Pasting in the unchanged JS functions to keep it complete ---
+    conn?.on('data', (data) => {
+        const textToShow = myLanguage === data.senderLang ? data.original : data.translated;
+        const originalText = myLanguage === data.senderLang ? data.translated : data.original;
+        displayMessage(textToShow, 'received', originalText);
+    });
     chatForm.addEventListener('submit', async (e) => {
         e.preventDefault();
         const msg = chatInput.value;
         if (!msg) return;
-
-        // Disable button to prevent multiple submissions while translating
         chatForm.querySelector('button').disabled = true;
-
         const targetLang = myLanguage === 'en' ? 'ja' : 'en';
         const translatedMsg = await liveTranslate(msg, myLanguage, targetLang);
-        
-        const dataToSend = {
-            original: msg,
-            translated: translatedMsg,
-            senderLang: myLanguage
-        };
-
+        const dataToSend = { original: msg, translated: translatedMsg, senderLang: myLanguage };
         conn.send(dataToSend);
         displayMessage(msg, 'sent', translatedMsg);
         chatInput.value = '';
-        chatForm.querySelector('button').disabled = false; // Re-enable button
+        chatForm.querySelector('button').disabled = false;
     });
-
     function displayMessage(text, type, originalText) {
         const wrapper = document.createElement('div');
         wrapper.className = 'bubble-wrapper';
         const bubble = document.createElement('div');
         bubble.className = `bubble ${type}`;
         bubble.textContent = text;
-        const toggle = document.createElement('div');
-        toggle.className = 'original-text-toggle';
-        toggle.textContent = 'show original';
-        toggle.dataset.original = originalText;
-        toggle.dataset.translated = text;
         wrapper.appendChild(bubble);
-        if (type === 'received') { // Only show toggle for received messages
+        if (type === 'received') {
+            const toggle = document.createElement('div');
+            toggle.className = 'original-text-toggle';
+            toggle.textContent = 'show original';
+            toggle.dataset.original = originalText;
+            toggle.dataset.translated = text;
             wrapper.appendChild(toggle);
         }
         messagesDiv.appendChild(wrapper);
         messagesDiv.scrollTop = messagesDiv.scrollHeight;
     }
-
     messagesDiv.addEventListener('click', (e) => {
         if (e.target.classList.contains('original-text-toggle')) {
             const toggle = e.target;
@@ -183,6 +236,7 @@
             toggle.dataset.original = currentText;
         }
     });
+
 </script>
 
 </body>

@@ -20,14 +20,15 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- Navigation ---
     function navigateTo(screenName) {
         Object.values(screens).forEach(s => s.classList.remove('active'));
-        screens[screenName].classList.add('active');
+        if (screens[screenName]) {
+            screens[screenName].classList.add('active');
+        }
     }
 
     // --- Connection Setup ---
     function initializeConnection(conn) {
         dataConnection = conn;
         dataConnection.on('open', () => {
-            console.log('Data connection is open!');
             navigateTo('chat');
         });
         dataConnection.on('data', (data) => {
@@ -35,47 +36,54 @@ document.addEventListener('DOMContentLoaded', () => {
             displayMessage(message.text, message.lang, 'received');
         });
         dataConnection.on('close', () => {
-            console.log('Connection closed.');
             alert('The other user has disconnected.');
-            // Reset peer object to allow for new connections
             if (peer) peer.destroy();
             navigateTo('home');
         });
     }
 
+    // --- Reset UI state ---
+    function resetButtons() {
+        hostBtn.disabled = false;
+        hostBtn.textContent = 'Host a Room';
+        joinBtn.disabled = false;
+        joinBtn.textContent = 'Join a Room';
+    }
+
     // --- Automatically Join if URL has hostId ---
-    // NEW: Check for a hostId in the URL when the page loads
     const urlParams = new URLSearchParams(window.location.search);
     const hostIdFromUrl = urlParams.get('hostId');
 
     if (hostIdFromUrl) {
-        // If a hostId is found, this user is a guest, so connect automatically
-        // Hide the home screen immediately
         screens.home.classList.remove('active');
-        
-        peer = new Peer(); // Create a peer for the guest
+        if (peer) peer.destroy();
+        peer = new Peer();
         peer.on('open', () => {
-            const conn = peer.connect(hostIdFromUrl); // Attempt to connect to the host
+            const conn = peer.connect(hostIdFromUrl);
             initializeConnection(conn);
         });
-        peer.on('error', (err) => alert('An error occurred: ' + err.message));
+        peer.on('error', (err) => {
+            alert('Failed to connect: ' + err.message);
+            window.location.search = ''; // Clear params and reload
+        });
     } else {
-        // No hostId, show the regular home screen
         navigateTo('home');
     }
-
 
     // --- UI Event Listeners ---
     
     // HOST: User clicks "Host a Room"
     hostBtn.addEventListener('click', () => {
-        if (peer) peer.destroy(); // Destroy any old peer object
-        peer = new Peer(); // Create a new peer with a random ID
-        
+        // FIXED: Provide immediate feedback and handle state
+        hostBtn.disabled = true;
+        hostBtn.textContent = 'Initializing...';
+        joinBtn.disabled = true;
+
+        if (peer) peer.destroy();
+        peer = new Peer();
+
         peer.on('open', (id) => {
-            console.log('My peer ID is: ' + id);
-            
-            // MODIFIED: Create a full URL for the QR code
+            resetButtons();
             const cleanUrl = `${window.location.origin}${window.location.pathname}`;
             const joinUrl = `${cleanUrl}?hostId=${id}`;
 
@@ -83,17 +91,21 @@ document.addEventListener('DOMContentLoaded', () => {
             qrCodeContainer.innerHTML = '';
             qrcode.stringToBytes = qrcode.stringToBytesFuncs['UTF-8'];
             const qr = qrcode(0, 'L');
-            qr.addData(joinUrl, 'Byte'); // The QR code now contains the full URL
+            qr.addData(joinUrl, 'Byte');
             qr.make();
             qrCodeContainer.innerHTML = qr.createImgTag(6, 0);
 
             navigateTo('idModal');
         });
-        
+
         peer.on('connection', (conn) => {
             initializeConnection(conn);
         });
-        peer.on('error', (err) => alert('An error occurred: ' + err.message));
+
+        peer.on('error', (err) => {
+            alert('An error occurred: ' + err.message);
+            resetButtons();
+        });
     });
 
     // GUEST (Manual Join): User clicks "Join a Room"
@@ -101,34 +113,63 @@ document.addEventListener('DOMContentLoaded', () => {
         const manualHostId = prompt("Please enter the host's ID:");
         if (!manualHostId) return;
         
+        // FIXED: Provide immediate feedback and handle state
+        joinBtn.disabled = true;
+        joinBtn.textContent = 'Connecting...';
+        hostBtn.disabled = true;
+
         if (peer) peer.destroy();
-        peer = new Peer(); // Create a peer for the guest
+        peer = new Peer();
         peer.on('open', () => {
-            const conn = peer.connect(manualHostId); // Attempt to connect
+            const conn = peer.connect(manualHostId);
+            conn.on('error', (err) => { // Handle connection-specific errors
+                alert('Connection failed: ' + err.message);
+                resetButtons();
+            });
             initializeConnection(conn);
         });
-        peer.on('error', (err) => alert('An error occurred: ' + err.message));
-    });
-
-    closeIdBtn.addEventListener('click', () => navigateTo('home'));
-
-    sendBtns.forEach(btn => {
-        btn.addEventListener('click', () => {
-            const text = messageInput.value.trim();
-            const lang = btn.dataset.lang;
-            if (!text || !dataConnection) return;
-
-            if (lang === 'en') {
-                const message = { text, lang: 'en' };
-                dataConnection.send(JSON.stringify(message));
-                displayMessage(text, 'en', 'sent');
-            } else {
-                translateAndSend(text, 'en|ja');
-            }
-            messageInput.value = '';
+        peer.on('error', (err) => {
+            alert('An error occurred: ' + err.message);
+            resetButtons();
         });
     });
-    
+
+    closeIdBtn.addEventListener('click', () => {
+        if (peer) peer.destroy(); // End the peer connection when host closes modal
+        navigateTo('home');
+    });
+
     // --- Message & Translation Logic (Unchanged) ---
     async function translateAndSend(text, langPair) {
-        try
+        try {
+            const response = await fetch(`https://api.mymemory.translated.net/get?q=${encodeURIComponent(text)}&langpair=${langPair}`);
+            const data = await response.json();
+            const translatedText = data.responseData.translatedText;
+            const message = { text: translatedText, lang: 'ja' };
+            dataConnection.send(JSON.stringify(message));
+            displayMessage(translatedText, 'ja', 'sent');
+        } catch (error) {
+            console.error('Translation error:', error);
+            displayMessage('Translation Error', 'en', 'sent');
+        }
+    }
+
+    function displayMessage(message, lang, type) {
+        const bubble = document.createElement('div');
+        bubble.className = `bubble ${type}`;
+        bubble.dataset.lang = lang;
+        const parts = (lang === 'ja') ? message.split('') : message.split(/(\s+)/);
+        parts.forEach((part, index) => {
+            if (part.trim() !== '' || (lang === 'ja' && part.trim() === '')) {
+                const span = document.createElement('span');
+                span.textContent = part;
+                span.style.animationDelay = `${index * 0.05}s`;
+                bubble.appendChild(span);
+            } else {
+                bubble.appendChild(document.createTextNode(part));
+            }
+        });
+        messagesContainer.appendChild(bubble);
+        messagesContainer.scrollTop = messagesContainer.scrollHeight;
+    }
+});

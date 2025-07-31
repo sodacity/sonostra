@@ -1,24 +1,21 @@
-// public/app.js
 document.addEventListener('DOMContentLoaded', () => {
     // --- DOM Elements & State ---
     const screens = {
         home: document.getElementById('home-screen'),
         chat: document.getElementById('chat-screen'),
-        qrModal: document.getElementById('qr-modal'),
+        idModal: document.getElementById('id-modal'),
     };
     const hostBtn = document.getElementById('host-btn');
-    const closeQrBtn = document.getElementById('close-qr-btn');
+    const joinBtn = document.getElementById('join-btn');
+    const closeIdBtn = document.getElementById('close-id-btn');
     const messageInput = document.getElementById('message-input');
     const sendBtns = document.querySelectorAll('.send-btn');
     const messagesContainer = document.getElementById('messages-container');
     const qrCodeContainer = document.getElementById('qrcode');
+    const hostIdText = document.getElementById('host-id-text');
 
-    let roomId = null;
-    let peerConnection;
-    let dataChannel;
-    let isPolite; // To avoid WebRTC glare/race conditions
-
-    const socket = io();
+    let peer;
+    let dataConnection;
 
     // --- Navigation ---
     function navigateTo(screenName) {
@@ -26,110 +23,82 @@ document.addEventListener('DOMContentLoaded', () => {
         screens[screenName].classList.add('active');
     }
 
-    // --- WebRTC Core Logic ---
-    async function createPeerConnection() {
-        peerConnection = new RTCPeerConnection({
-            iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] // Public STUN server
+    // --- Connection Setup ---
+    function initializeConnection(conn) {
+        dataConnection = conn;
+
+        dataConnection.on('open', () => {
+            console.log('Data connection is open!');
+            navigateTo('chat');
         });
 
-        peerConnection.onicecandidate = (event) => {
-            if (event.candidate) {
-                socket.emit('signal', { to: roomId, signal: { candidate: event.candidate } });
-            }
-        };
-
-        // This is triggered on the "impolite" peer's side when the polite peer adds a data channel
-        peerConnection.ondatachannel = (event) => {
-            dataChannel = event.channel;
-            setupDataChannel();
-        };
-    }
-
-    function setupDataChannel() {
-        dataChannel.onopen = () => {
-            console.log('Data channel is open!');
-            navigateTo('chat');
-        };
-        dataChannel.onmessage = (event) => {
-            const message = JSON.parse(event.data);
+        dataConnection.on('data', (data) => {
+            const message = JSON.parse(data);
             displayMessage(message.text, message.lang, 'received');
-        };
-        dataChannel.onclose = () => {
-            console.log('Data channel is closed.');
-        };
+        });
+
+        dataConnection.on('close', () => {
+            console.log('Connection closed.');
+            alert('The other user has disconnected.');
+            navigateTo('home');
+        });
     }
-    
-    // --- Signaling via Socket.IO ---
-    socket.on('connect', () => {
-        console.log('Connected to signaling server with ID:', socket.id);
-        const urlParams = new URLSearchParams(window.location.search);
-        const joinRoomId = urlParams.get('room');
-        if (joinRoomId) {
-            // This user is joining via a QR code link
-            isPolite = false;
-            roomId = joinRoomId;
-            socket.emit('join-room', roomId);
-            createPeerConnection();
-        }
-    });
-
-    socket.on('peer-joined', async (peerId) => {
-        // The host (polite peer) gets this message when a peer joins
-        console.log('Peer joined:', peerId);
-        roomId = peerId; // The "room" is now the other peer's ID
-        isPolite = true;
-        createPeerConnection();
-
-        // The polite peer creates the data channel and the offer
-        dataChannel = peerConnection.createDataChannel('chat');
-        setupDataChannel();
-
-        const offer = await peerConnection.createOffer();
-        await peerConnection.setLocalDescription(offer);
-        socket.emit('signal', { to: roomId, signal: { sdp: peerConnection.localDescription } });
-    });
-
-    socket.on('signal', async ({ from, signal }) => {
-        if (!peerConnection) createPeerConnection();
-
-        if (signal.sdp) {
-            await peerConnection.setRemoteDescription(new RTCSessionDescription(signal.sdp));
-            if (signal.sdp.type === 'offer') {
-                const answer = await peerConnection.createAnswer();
-                await peerConnection.setLocalDescription(answer);
-                socket.emit('signal', { to: from, signal: { sdp: peerConnection.localDescription } });
-            }
-        } else if (signal.candidate) {
-            await peerConnection.addIceCandidate(new RTCIceCandidate(signal.candidate));
-        }
-    });
 
     // --- UI Event Listeners ---
+    
+    // HOST: User clicks "Host a Room"
     hostBtn.addEventListener('click', () => {
-        roomId = socket.id; // The host's room ID is their own socket ID
-        const joinUrl = `${window.location.origin}${window.location.pathname}?room=${roomId}`;
+        peer = new Peer(); // Create a new peer with a random ID from the PeerJS server
         
-        qrCodeContainer.innerHTML = '';
-        qrcode.stringToBytes = qrcode.stringToBytesFuncs['UTF-8'];
-        const qr = qrcode(0, 'L');
-        qr.addData(joinUrl, 'Byte');
-        qr.make();
-        qrCodeContainer.innerHTML = qr.createImgTag(6, 0);
+        peer.on('open', (id) => {
+            console.log('My peer ID is: ' + id);
+            hostIdText.textContent = id;
+            
+            // Generate QR Code with the ID string
+            qrCodeContainer.innerHTML = '';
+            qrcode.stringToBytes = qrcode.stringToBytesFuncs['UTF-8'];
+            const qr = qrcode(0, 'L');
+            qr.addData(id, 'Byte'); // The QR code now just contains the ID
+            qr.make();
+            qrCodeContainer.innerHTML = qr.createImgTag(6, 0);
 
-        navigateTo('qrModal');
+            navigateTo('idModal');
+        });
+        
+        // Listen for an incoming connection from a guest
+        peer.on('connection', (conn) => {
+            initializeConnection(conn);
+        });
+
+        peer.on('error', (err) => alert('An error occurred: ' + err.message));
     });
 
-    closeQrBtn.addEventListener('click', () => navigateTo('home'));
+    // GUEST: User clicks "Join a Room"
+    joinBtn.addEventListener('click', () => {
+        const hostId = prompt("Please enter the host's ID:");
+        if (!hostId) return;
+
+        peer = new Peer(); // Create a peer for the guest
+
+        peer.on('open', () => {
+            const conn = peer.connect(hostId); // Attempt to connect to the host
+            initializeConnection(conn);
+        });
+        
+        peer.on('error', (err) => alert('An error occurred: ' + err.message));
+    });
+
+    closeIdBtn.addEventListener('click', () => navigateTo('home'));
 
     sendBtns.forEach(btn => {
         btn.addEventListener('click', () => {
             const text = messageInput.value.trim();
             const lang = btn.dataset.lang;
-            if (!text || !dataChannel || dataChannel.readyState !== 'open') return;
+            if (!text || !dataConnection) return;
 
             if (lang === 'en') {
                 const message = { text, lang: 'en' };
-                dataChannel.send(JSON.stringify(message));
+                dataConnection.send(JSON.stringify(message));
                 displayMessage(text, 'en', 'sent');
             } else {
                 translateAndSend(text, 'en|ja');
@@ -146,11 +115,11 @@ document.addEventListener('DOMContentLoaded', () => {
             const translatedText = data.responseData.translatedText;
 
             const message = { text: translatedText, lang: 'ja' };
-            dataChannel.send(JSON.stringify(message));
+            dataConnection.send(JSON.stringify(message));
             displayMessage(translatedText, 'ja', 'sent');
         } catch (error) {
             console.error('Translation error:', error);
-            displayMessage('Translation Error', 'en', 'sent'); // Send error as a message
+            displayMessage('Translation Error', 'en', 'sent');
         }
     }
 

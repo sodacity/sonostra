@@ -792,6 +792,12 @@ function resetGame() {
     gameState.status = 'playing';
     gameState.sequenceTurnCounter = 0;
     gameState.bossIsEnraged = false;
+    
+    // --- FIX: Reset global touch state variables ---
+    touchStartX = 0;
+    touchStartY = 0;
+    // ---------------------------------------------
+
     if(gameState.bossMode) {
         initBoss();
     }

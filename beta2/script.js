@@ -1220,3 +1220,4 @@ function addChatMessage(message, type) {
 }
 
 init();
+

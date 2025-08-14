@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sonostra</title>
+    <meta name="theme-color" content="#121212"/>
+    <link rel="manifest" href="manifest.json">
+    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Audiowide&family=Roboto:wght@400;500;700&family=Orbitron:wght@700;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <svg width="0" height="0" style="position:absolute">
+        <defs>
+            <linearGradient id="grad-up" x1="0%" y1="100%" x2="0%" y2="0%"><stop id="grad-up-1" offset="0%" style="stop-color:#2979FF;stop-opacity:1" /><stop id="grad-up-2" offset="100%" style="stop-color:#82B1FF;stop-opacity:1" /></linearGradient>
+            <linearGradient id="grad-down" x1="0%" y1="0%" x2="0%" y2="100%"><stop id="grad-down-1" offset="0%" style="stop-color:#FF1744;stop-opacity:1" /><stop id="grad-down-2" offset="100%" style="stop-color:#FF8A80;stop-opacity:1" /></linearGradient>
+            <linearGradient id="grad-left" x1="100%" y1="0%" x2="0%" y2="0%"><stop id="grad-left-1" offset="0%" style="stop-color:#7C4DFF;stop-opacity:1" /><stop id="grad-left-2" offset="100%" style="stop-color:#B388FF;stop-opacity:1" /></linearGradient>
+            <linearGradient id="grad-right" x1="0%" y1="0%" x2="100%" y2="0%"><stop id="grad-right-1" offset="0%" style="stop-color:#00E676;stop-opacity:1" /><stop id="grad-right-2" offset="100%" style="stop-color:#B9F6CA;stop-opacity:1" /></linearGradient>
+            <linearGradient id="grad-success" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" style="stop-color:#FFFF00;stop-opacity:1" /><stop offset="100%" style="stop-color:#FFEE58;stop-opacity:1" /></linearGradient>
+        </defs>
+    </svg>
+
+    <div id="title-screen">
+        <h1 class="title-main">Sonostra</h1>
+        <p id="press-start-text">Press Any Key or Click to Start</p>
+    </div>
+
+    <div id="video-wall-container"></div>
+    
+    <div id="game-overlay">
+        <div id="lobby-overlay" class="hidden">
+            <p id="lobby-text"></p>
+        </div>
+
+        <div id="reward-announcement" class="hidden"></div>
+        <div id="wave-announcement" class="hidden"></div>
+        <div id="warning-encounter" class="hidden">WARNING!!!</div>
+
+        <button id="fullscreen-btn">
+            <svg id="fullscreen-icon" viewBox="0 0 24 24"><path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 2h-2v3h-3v2h5v-5zm-3-4V5h-3v2h3v3z"></path></svg>
+            <svg id="exit-fullscreen-icon" class="hidden" viewBox="0 0 24 24"><path d="M5 16h3v3h2v-5H5v2zm3-8H5v2h5V5H8v3zm6 11h2v-3h3v-2h-5v5zm2-11V5h-2v5h5V8h-3z"></path></svg>
+        </button>
+
+        <div id="connection-setup" class="glass-card">
+            <button id="settings-btn">⚙️</button>
+            <h1>Sonostra</h1>
+            <div class="input-group">
+                <input type="text" id="player-name-input" placeholder="Enter Your Name">
+                <input type="text" id="room-name-input" placeholder="Enter Room Name (for multiplayer)">
+                <div class="input-row">
+                    <input type="text" id="video-url-input" placeholder="YouTube/Video URL (Optional)">
+                </div>
+            </div>
+            <div class="toggle-group">
+                <label class="toggle-switch">
+                    <span>Solo</span>
+                    <input type="checkbox" id="game-mode-toggle">
+                    <span class="slider"></span>
+                    <span>Multiplayer</span>
+                </label>
+                <label class="toggle-switch" id="boss-mode-container">
+                    <span>Wave Mode</span>
+                    <input type="checkbox" id="boss-mode-toggle">
+                    <span class="slider"></span>
+                </label>
+            </div>
+            <div class="button-group">
+                <button id="start-btn" class="btn btn-primary">Start Game</button>
+                <button id="join-btn" class="btn btn-secondary">Join Game</button>
+            </div>
+        </div>
+
+        <div id="game-area">
+            <div id="boss-area" style="display: none;">
+                <div id="boss-info">
+                    <span id="boss-symbol" class="hidden"></span>
+                    <span id="boss-name"></span>
+                    <span id="boss-level"></span>
+                </div>
+                <div id="boss-health-bar-container">
+                    <div id="boss-health-bar"></div>
+                    <div class="health-bar-shard" id="shard1"></div>
+                    <div class="health-bar-shard" id="shard2"></div>
+                    <div class="health-bar-shard" id="shard3"></div>
+                    <div class="health-bar-shard" id="shard4"></div>
+                    <div class="health-bar-shard" id="shard5"></div>
+                </div>
+            </div>
+            <div id="game-container">
+                <div class="player-area" id="player1-container">
+                    <div class="player-header">
+                        <span id="name-p1" class="player-name">Player 1</span>
+                        <div id="lives-p1" class="player-lives"></div>
+                    </div>
+                    <div class="attack-announcement" id="attack-announcement-p1"></div>
+                    <div class="combo-counter-container" id="combo-p1">
+                        <span class="combo-count">0</span>
+                        <span class="combo-label">COMBO</span>
+                    </div>
+                    <div class="game-grid glass-card" id="grid-p1">
+                        <div class="sequence-container" id="sequence-p1"></div>
+                    </div>
+                    <div class="timer-bar-container">
+                        <div class="timer-bar" id="timer-bar-p1"></div>
+                        <div class="timer-effect timer-fire-effect" id="timer-fire-p1"></div>
+                        <div class="timer-effect timer-poison-effect" id="timer-poison-p1"></div>
+                        <div class="timer-effect timer-ice-effect" id="timer-ice-p1"></div>
+                    </div>
+                </div>
+                <div class="player-area" id="player2-container">
+                     <div class="player-header">
+                        <span id="name-p2" class="player-name">Player 2</span>
+                        <div id="lives-p2" class="player-lives"></div>
+                    </div>
+                    <div class="attack-announcement" id="attack-announcement-p2"></div>
+                    <div class="combo-counter-container" id="combo-p2">
+                        <span class="combo-count">0</span>
+                        <span class="combo-label">COMBO</span>
+                    </div>
+                    <div class="game-grid glass-card" id="grid-p2">
+                        <div class="sequence-container" id="sequence-p2"></div>
+                    </div>
+                     <div class="timer-bar-container">
+                        <div class="timer-bar" id="timer-bar-p2"></div>
+                        <div class="timer-effect timer-fire-effect" id="timer-fire-p2"></div>
+                        <div class="timer-effect timer-poison-effect" id="timer-poison-p2"></div>
+                        <div class="timer-effect timer-ice-effect" id="timer-ice-p2"></div>
+                     </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="settings-screen" class="glass-card hidden">
+        <h1>Settings</h1>
+        
+        <div class="settings-section">
+            <h2>Controls</h2>
+            <div class="control-grid">
+                <div class="control-item"><label for="bind-up-btn">Up</label><button id="bind-up-btn">ArrowUp</button></div>
+                <div class="control-item"><label for="bind-down-btn">Down</label><button id="bind-down-btn">ArrowDown</button></div>
+                <div class="control-item"><label for="bind-left-btn">Left</label><button id="bind-left-btn">ArrowLeft</button></div>
+                <div class="control-item"><label for="bind-right-btn">Right</label><button id="bind-right-btn">ArrowRight</button></div>
+            </div>
+        </div>
+
+        <div class="settings-section">
+            <h2>Colors</h2>
+            <div class="color-grid">
+                <div class="color-item"><label for="color-up-input">Up Arrow</label><input type="color" id="color-up-input" value="#2979FF"></div>
+                <div class="color-item"><label for="color-down-input">Down Arrow</label><input type="color" id="color-down-input" value="#FF1744"></div>
+                <div class="color-item"><label for="color-left-input">Left Arrow</label><input type="color" id="color-left-input" value="#7C4DFF"></div>
+                <div class="color-item"><label for="color-right-input">Right Arrow</label><input type="color" id="color-right-input" value="#00E676"></div>
+                <div class="color-item"><label for="color-grid-input">Grid BG</label><input type="color" id="color-grid-input" value="#161616"></div>
+            </div>
+        </div>
+
+        <div class="button-group">
+            <button id="save-settings-btn" class="btn btn-primary">Save</button>
+            <button id="defaults-settings-btn" class="btn btn-secondary">Load Defaults</button>
+            <button id="close-settings-btn" class="btn btn-secondary">Close</button>
+        </div>
+    </div>
+
+
+    <div id="popup-chat-container">
+        <div id="chat-bubbles"></div>
+    </div>
+    <div id="chat-input-container" style="display: none;">
+        <input type="text" id="chat-input" placeholder="Type a message...">
+        <button id="chat-send-btn" class="btn btn-secondary">Send</button>
+    </div>
+
+    <div id="game-over-screen">
+        <div id="game-over-content">
+            <h2 id="game-over-title"></h2>
+            <p id="winner-name-display"></p>
+            
+            <div id="post-game-stats">
+                <div class="stat-item">
+                    <span class="stat-label">Highest Combo</span>
+                    <span id="stats-combo" class="stat-value">0</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">Sequences Cleared</span>
+                    <span id="stats-cleared" class="stat-value">0</span>
+                </div>
+                <div class="stat-item" id="damage-stat-container">
+                    <span class="stat-label">Damage Dealt</span>
+                    <span id="stats-damage" class="stat-value">0</span>
+                </div>
+            </div>
+    
+            <div id="next-video-section">
+                <input type="text" id="next-video-input" placeholder="Next YouTube/Video URL...">
+                <button id="change-video-btn" class="btn btn-secondary">Update Video</button>
+            </div>
+    
+            <button id="rematch-btn" class="btn btn-primary">Rematch</button>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>

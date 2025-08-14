@@ -23,6 +23,7 @@ const DOMElements = {
     winnerNameDisplay: document.getElementById('winner-name-display'),
     rematchBtn: document.getElementById('rematch-btn'),
     bossArea: document.getElementById('boss-area'),
+    bossSymbol: document.getElementById('boss-symbol'),
     bossName: document.getElementById('boss-name'),
     bossLevel: document.getElementById('boss-level'),
     bossHealthBar: document.getElementById('boss-health-bar'),
@@ -38,10 +39,137 @@ const DOMElements = {
     changeVideoBtn: document.getElementById('change-video-btn'),
     lobbyOverlay: document.getElementById('lobby-overlay'),
     lobbyText: document.getElementById('lobby-text'),
+    waveAnnouncement: document.getElementById('wave-announcement'),
+    warningEncounter: document.getElementById('warning-encounter'),
+    rewardAnnouncement: document.getElementById('reward-announcement'),
+    settingsBtn: document.getElementById('settings-btn'),
+    settingsScreen: document.getElementById('settings-screen'),
+    bindUpBtn: document.getElementById('bind-up-btn'),
+    bindDownBtn: document.getElementById('bind-down-btn'),
+    bindLeftBtn: document.getElementById('bind-left-btn'),
+    bindRightBtn: document.getElementById('bind-right-btn'),
+    colorUpInput: document.getElementById('color-up-input'),
+    colorDownInput: document.getElementById('color-down-input'),
+    colorLeftInput: document.getElementById('color-left-input'),
+    colorRightInput: document.getElementById('color-right-input'),
+    colorGridInput: document.getElementById('color-grid-input'),
+    saveSettingsBtn: document.getElementById('save-settings-btn'),
+    defaultsSettingsBtn: document.getElementById('defaults-settings-btn'),
+    closeSettingsBtn: document.getElementById('close-settings-btn'),
 };
 
+// --- Settings Management ---
+const defaultSettings = {
+    playerName: '',
+    keyBinds: { ArrowUp: 'ArrowUp', ArrowDown: 'ArrowDown', ArrowLeft: 'ArrowLeft', ArrowRight: 'ArrowRight' },
+    colors: { up: '#2979FF', down: '#FF1744', left: '#7C4DFF', right: '#00E676', grid: '#161616' }
+};
+let currentSettings = JSON.parse(JSON.stringify(defaultSettings));
+
+function hexToRgba(hex, alpha) {
+    let r = 0, g = 0, b = 0;
+    if (hex.length == 4) {
+        r = "0x" + hex[1] + hex[1];
+        g = "0x" + hex[2] + hex[2];
+        b = "0x" + hex[3] + hex[3];
+    } else if (hex.length == 7) {
+        r = "0x" + hex[1] + hex[2];
+        g = "0x" + hex[3] + hex[4];
+        b = "0x" + hex[5] + hex[6];
+    }
+    return `rgba(${+r},${+g},${+b},${alpha})`;
+}
+
+function applySettings() {
+    document.getElementById('grad-up-1').style.stopColor = currentSettings.colors.up;
+    document.getElementById('grad-up-2').style.stopColor = currentSettings.colors.up;
+    document.getElementById('grad-down-1').style.stopColor = currentSettings.colors.down;
+    document.getElementById('grad-down-2').style.stopColor = currentSettings.colors.down;
+    document.getElementById('grad-left-1').style.stopColor = currentSettings.colors.left;
+    document.getElementById('grad-left-2').style.stopColor = currentSettings.colors.left;
+    document.getElementById('grad-right-1').style.stopColor = currentSettings.colors.right;
+    document.getElementById('grad-right-2').style.stopColor = currentSettings.colors.right;
+
+    const gridBgRgba = hexToRgba(currentSettings.colors.grid, 0.6);
+    document.querySelectorAll('.game-grid').forEach(grid => {
+        grid.style.backgroundColor = gridBgRgba;
+    });
+
+    DOMElements.playerNameInput.value = currentSettings.playerName;
+}
+
+function updateSettingsUI() {
+    DOMElements.playerNameInput.value = currentSettings.playerName;
+    
+    DOMElements.bindUpBtn.textContent = currentSettings.keyBinds.ArrowUp;
+    DOMElements.bindDownBtn.textContent = currentSettings.keyBinds.ArrowDown;
+    DOMElements.bindLeftBtn.textContent = currentSettings.keyBinds.ArrowLeft;
+    DOMElements.bindRightBtn.textContent = currentSettings.keyBinds.ArrowRight;
+    
+    DOMElements.colorUpInput.value = currentSettings.colors.up;
+    DOMElements.colorDownInput.value = currentSettings.colors.down;
+    DOMElements.colorLeftInput.value = currentSettings.colors.left;
+    DOMElements.colorRightInput.value = currentSettings.colors.right;
+    DOMElements.colorGridInput.value = currentSettings.colors.grid;
+}
+
+function saveSettings() {
+    currentSettings.playerName = DOMElements.playerNameInput.value;
+    currentSettings.colors.up = DOMElements.colorUpInput.value;
+    currentSettings.colors.down = DOMElements.colorDownInput.value;
+    currentSettings.colors.left = DOMElements.colorLeftInput.value;
+    currentSettings.colors.right = DOMElements.colorRightInput.value;
+    currentSettings.colors.grid = DOMElements.colorGridInput.value;
+
+    localStorage.setItem('sonostraSettings', JSON.stringify(currentSettings));
+
+    const saveBtn = DOMElements.saveSettingsBtn;
+    saveBtn.textContent = 'Saved!';
+    setTimeout(() => { saveBtn.textContent = 'Save'; }, 1500);
+}
+
+function loadSettings() {
+    const saved = localStorage.getItem('sonostraSettings');
+    if (saved) {
+        const savedSettings = JSON.parse(saved);
+        Object.assign(currentSettings.keyBinds, savedSettings.keyBinds);
+        Object.assign(currentSettings.colors, savedSettings.colors);
+        currentSettings.playerName = savedSettings.playerName || '';
+    }
+    applySettings();
+    updateSettingsUI();
+}
+
+function listenForKeybind(action, btnElement) {
+    const listeningBtns = document.querySelectorAll('.listening');
+    if (listeningBtns.length > 0) return;
+
+    btnElement.textContent = 'Press any key...';
+    btnElement.classList.add('listening');
+
+    const handleKeyDown = (e) => {
+        e.preventDefault();
+        const newKey = e.key;
+
+        const isKeyBound = Object.values(currentSettings.keyBinds).includes(newKey);
+        if (isKeyBound && currentSettings.keyBinds[action] !== newKey) {
+            alert(`Key "${newKey}" is already bound to another action.`);
+            btnElement.textContent = currentSettings.keyBinds[action];
+        } else {
+            currentSettings.keyBinds[action] = newKey;
+            btnElement.textContent = newKey;
+        }
+
+        btnElement.classList.remove('listening');
+        window.removeEventListener('keydown', handleKeyDown);
+    };
+
+    window.addEventListener('keydown', handleKeyDown, { once: true });
+}
+
 // --- Game Data ---
-const BOSS_NAMES = ["Sonus", "Tremor", "Siren", "Symphony", "Echo", "Sonoris", "Noctaria", "Legion", "Echolyra", "Stellaria", "Orbisona"];
+const BOSS_NAMES = ["Sonus", "Tremor", "Siren", "Symphony", "Echo"]; // Echoes
+const MENACING_BOSS_NAMES = ["Sonoris", "Noctaria", "Legion", "Echolyra", "Stellaria", "Orbisona"]; // Crescendos
 const BOSS_ELEMENTS = ["fire", "poison", "ice"];
 const BOSS_ACTIONS = ["timer_burn", "blur", "stealth", "heal", "seismic_shift", "rhythm_shift"];
 const ATTACK_NAMES = {
@@ -59,6 +187,7 @@ const ARROW_SVG = {
 };
 const LIFE_SVG = `<svg class="life-heart" viewBox="0 0 24 24" fill="currentColor"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"></path></svg>`;
 const ARROW_KEYS = ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'];
+const COMBO_COLORS = ['#03A9F4', '#FF00FF', '#FFFF00', '#00E676', '#7C4DFF'];
 
 // --- Game State & Management ---
 let peer, conn;
@@ -70,6 +199,8 @@ const gameState = {
     isHost: false,
     mode: 'solo',
     bossMode: false,
+    currentWave: 1,
+    isCrescendoWave: false,
     bossIsEnraged: false,
     sequenceTurnCounter: 0,
     bossName: '',
@@ -96,6 +227,7 @@ class Player {
         this.decayActive = false;
         this.highestCombo = 0;
         this.damageDealt = 0;
+        this.speedBoostActive = false;
 
         this.dom = {
             playerArea: document.getElementById(`player${id}-container`),
@@ -131,6 +263,7 @@ class Player {
         this.combo = combo;
         this.highestCombo = Math.max(this.highestCombo, this.combo);
         this.dom.comboCount.textContent = this.combo;
+
         if (this.combo > 0) {
             this.dom.comboContainer.classList.add('visible');
             this.dom.comboCount.classList.add('pop');
@@ -138,6 +271,21 @@ class Player {
         } else {
             this.dom.comboContainer.classList.remove('visible');
         }
+
+        if (this.combo >= 50) {
+            this.dom.grid.classList.add('combo-fever');
+            if (this.combo % 10 === 0) {
+                const colorIndex = (this.combo / 10) % COMBO_COLORS.length;
+                this.dom.grid.style.setProperty('--glow-color', COMBO_COLORS[colorIndex]);
+            }
+            const vibrancyLevel = Math.floor(this.combo / 100);
+            const glowSize = 25 + (vibrancyLevel * 10);
+            this.dom.grid.style.setProperty('--glow-size', `${glowSize}px`);
+        } else {
+            this.dom.grid.classList.remove('combo-fever');
+        }
+
+        this.speedBoostActive = this.combo >= 100;
     }
 
     startNewSequence(sequence = null) {
@@ -149,22 +297,29 @@ class Player {
             timerBarContainer.classList.add('decay-active');
             this.decayActive = false;
         } else {
-            this.timeLimit = Math.max(4000, 10000 - (this.successfulSequences * 400));
-            timerBarContainer.classList.remove('decay-active');
+            const baseTime = 10000;
+            const timeReduction = gameState.currentWave * 150;
+            this.timeLimit = Math.max(3500, baseTime - timeReduction);
+        }
+        
+        if (this.speedBoostActive) {
+            this.timeLimit *= 0.8;
         }
         
         cancelAnimationFrame(this.timerId);
         this.sequenceProgress = 0;
 
         if (!sequence) {
-            if (this.combo > 0 && this.combo % 9 === 0) {
-                this.sequenceLength = 12;
-            } else if (this.successfulSequences >= 8) {
-                this.sequenceLength = Math.floor(Math.random() * 5) + 4;
-            } else if (this.successfulSequences >= 3) {
-                this.sequenceLength = Math.min(8, this.successfulSequences + 1);
+            if (gameState.isCrescendoWave) {
+                this.sequenceLength = Math.floor(Math.random() * 4) + 9;
             } else {
-                this.sequenceLength = 3;
+                const baseLength = 3;
+                const lengthIncrease = Math.floor(gameState.currentWave / 2);
+                this.sequenceLength = Math.min(12, baseLength + lengthIncrease);
+
+                if (this.combo > 0 && this.combo % 9 === 0) {
+                    this.sequenceLength = 12;
+                }
             }
             this.currentSequence = Array.from({ length: this.sequenceLength }, () => ARROW_KEYS[Math.floor(Math.random() * 4)]);
         } else {
@@ -227,6 +382,7 @@ class Player {
 
 // --- Main Functions ---
 function init() {
+    loadSettings();
     setupTitleScreenListeners();
     setupUIListeners();
 
@@ -288,6 +444,37 @@ function setupUIListeners() {
             }
         }
     });
+
+    // Settings screen listeners
+    DOMElements.settingsBtn.addEventListener('click', () => {
+        updateSettingsUI();
+        DOMElements.settingsScreen.classList.remove('hidden');
+    });
+    DOMElements.closeSettingsBtn.addEventListener('click', () => {
+        loadSettings();
+        DOMElements.settingsScreen.classList.add('hidden');
+    });
+    DOMElements.saveSettingsBtn.addEventListener('click', saveSettings);
+    DOMElements.defaultsSettingsBtn.addEventListener('click', () => {
+        if (confirm('Are you sure you want to load default settings? Any unsaved changes will be lost.')) {
+            currentSettings = JSON.parse(JSON.stringify(defaultSettings));
+            applySettings();
+            updateSettingsUI();
+        }
+    });
+
+    DOMElements.bindUpBtn.addEventListener('click', () => listenForKeybind('ArrowUp', DOMElements.bindUpBtn));
+    DOMElements.bindDownBtn.addEventListener('click', () => listenForKeybind('ArrowDown', DOMElements.bindDownBtn));
+    DOMElements.bindLeftBtn.addEventListener('click', () => listenForKeybind('ArrowLeft', DOMElements.bindLeftBtn));
+    DOMElements.bindRightBtn.addEventListener('click', () => listenForKeybind('ArrowRight', DOMElements.bindRightBtn));
+
+    DOMElements.colorUpInput.addEventListener('input', () => { currentSettings.colors.up = DOMElements.colorUpInput.value; applySettings(); });
+    DOMElements.colorDownInput.addEventListener('input', () => { currentSettings.colors.down = DOMElements.colorDownInput.value; applySettings(); });
+    DOMElements.colorLeftInput.addEventListener('input', () => { currentSettings.colors.left = DOMElements.colorLeftInput.value; applySettings(); });
+    DOMElements.colorRightInput.addEventListener('input', () => { currentSettings.colors.right = DOMElements.colorRightInput.value; applySettings(); });
+    DOMElements.colorGridInput.addEventListener('input', () => { currentSettings.colors.grid = DOMElements.colorGridInput.value; applySettings(); });
+
+
     document.addEventListener('fullscreenchange', updateFullscreenIcons);
     window.addEventListener('keydown', handleKeyPress);
     handleGameModeChange();
@@ -300,11 +487,13 @@ function handleGameModeChange() {
         DOMElements.joinBtn.style.display = 'block';
         DOMElements.roomNameInput.style.display = 'block';
         DOMElements.startBtn.textContent = 'Create Game';
+        DOMElements.bossModeContainer.style.display = 'none';
     } else {
         gameState.mode = 'solo';
         DOMElements.joinBtn.style.display = 'none';
         DOMElements.roomNameInput.style.display = 'none';
         DOMElements.startBtn.textContent = 'Start Game';
+        DOMElements.bossModeContainer.style.display = 'flex';
     }
 }
 
@@ -321,11 +510,16 @@ function onStartGameClick() {
         localPlayer.dom.grid.addEventListener('touchend', handleTouchEnd, false);
         
         DOMElements.player2Container.style.display = 'none';
-        if (gameState.bossMode) initBoss();
         
         transitionToGameArea();
         setVideoBackground();
-        setTimeout(() => localPlayer.startNewSequence(), 1000);
+        
+        if (gameState.bossMode) {
+            startWave(1);
+        } else {
+            localPlayer.startNewSequence();
+        }
+
     } else { // Multiplayer
         const roomName = DOMElements.roomNameInput.value;
         if (!roomName) return alert('Please enter a room name.');
@@ -335,8 +529,6 @@ function onStartGameClick() {
         localPlayer.dom.grid.addEventListener('touchstart', handleTouchStart, false);
         localPlayer.dom.grid.addEventListener('touchmove', handleTouchMove, false);
         localPlayer.dom.grid.addEventListener('touchend', handleTouchEnd, false);
-
-        if (gameState.bossMode) initBoss();
         
         peer = new Peer(roomName);
         peer.on('open', id => {
@@ -390,16 +582,8 @@ function setupConnection() {
                         type: 'initial_state',
                         hostName: localPlayer.name,
                         videoUrl: gameState.videoUrl,
-                        bossState: gameState.bossMode ? {
-                            name: gameState.bossName,
-                            level: gameState.bossLevel,
-                            element: gameState.bossElement,
-                            maxHealth: gameState.bossMaxHealth,
-                            currentHealth: gameState.bossCurrentHealth,
-                        } : null
                     });
                     
-                    // Both players are connected, start the countdown
                     startCountdown();
                     sendData({ type: 'start_countdown' });
                 }
@@ -414,10 +598,6 @@ function setupConnection() {
                 setVideoBackground();
                 break;
             case 'initial_state':
-                if(data.bossState) {
-                    gameState.bossMode = true;
-                    initBoss(data.bossState);
-                }
                 remotePlayer = new Player(1, data.hostName, false);
                 remotePlayer.dom.playerArea.classList.add('is-remote-player');
                 gameState.videoUrl = data.videoUrl;
@@ -427,29 +607,12 @@ function setupConnection() {
                     remotePlayer.startNewSequence(data.sequence);
                     remotePlayer.updateCombo(data.combo);
                 }
-                hostCheckBossTrigger();
                 break;
             case 'key_press_update':
                 if (remotePlayer) handleRemoteKeyPress(data.progress);
                 break;
             case 'failure_update':
                  if (remotePlayer) remotePlayer.updateLives(data.lives);
-                break;
-            case 'boss_health_update':
-                updateBossHealth(data.newHealth, data.isHeavy);
-                break;
-            case 'boss_action':
-                if (data.action === 'heal') {
-                    DOMElements.bossArea.classList.add('boss-healing');
-                    setTimeout(() => DOMElements.bossArea.classList.remove('boss-healing'), 1000);
-                } else {
-                    const target = data.targetId === localPlayer.id ? localPlayer : remotePlayer;
-                    if(target) {
-                       DOMElements.bossArea.classList.add('boss-acting');
-                       setTimeout(() => DOMElements.bossArea.classList.remove('boss-acting'), 1000);
-                       applyBossAttack(data.action, target);
-                    }
-                }
                 break;
             case 'game_over':
                 gameOver(data.winnerName);
@@ -464,13 +627,53 @@ function setupConnection() {
     });
 }
 
+// --- Announcement and Wave Logic ---
+function showAnnouncement(element, text, duration) {
+    element.textContent = text;
+    element.classList.remove('hidden');
+    return new Promise(resolve => {
+        setTimeout(() => {
+            element.classList.add('hidden');
+            setTimeout(resolve, 300);
+        }, duration);
+    });
+}
+
+async function startWave(waveNumber) {
+    gameState.currentWave = waveNumber;
+    gameState.isCrescendoWave = gameState.currentWave % 3 === 0;
+
+    DOMElements.bossArea.classList.remove('crescendo-intro');
+
+    if (gameState.isCrescendoWave) {
+        await showAnnouncement(DOMElements.warningEncounter, 'WARNING!!!', 2500);
+        initBoss(true);
+    } else {
+        if (waveNumber > 1) {
+             await showAnnouncement(DOMElements.waveAnnouncement, `WAVE ${gameState.currentWave}`, 2000);
+        }
+        initBoss(false);
+    }
+    
+    localPlayer.startNewSequence();
+}
+
+function rewardPlayer() {
+    if (localPlayer.lives < 3) {
+        localPlayer.lives++;
+        localPlayer.updateLives(localPlayer.lives);
+        return true;
+    }
+    return false;
+}
+
 function startCountdown() {
     DOMElements.lobbyOverlay.classList.remove('hidden');
     let count = 3;
     const updateText = (text) => {
         DOMElements.lobbyText.textContent = text;
         DOMElements.lobbyText.classList.remove('countdown-pop');
-        void DOMElements.lobbyText.offsetWidth; // Trigger reflow
+        void DOMElements.lobbyText.offsetWidth;
         DOMElements.lobbyText.classList.add('countdown-pop');
     };
 
@@ -484,17 +687,10 @@ function startCountdown() {
             updateText('START!');
             setTimeout(() => {
                 DOMElements.lobbyOverlay.classList.add('hidden');
-                
-                // Start video and game for both players
                 setVideoBackground();
                 localPlayer.startNewSequence();
                 if (gameState.mode === 'multi') {
                     sendData({ type: 'new_sequence', sequence: localPlayer.currentSequence, combo: localPlayer.combo });
-                    if (remotePlayer && gameState.isHost) { // Host sends guest their first sequence
-                        const guestSequence = Array.from({ length: 3 }, () => ARROW_KEYS[Math.floor(Math.random() * 4)]);
-                        remotePlayer.startNewSequence(guestSequence);
-                        sendData({ type: 'start_game', sequence: guestSequence });
-                    }
                 }
             }, 1000);
         }
@@ -502,45 +698,43 @@ function startCountdown() {
 }
 
 // --- Boss Functions ---
-function initBoss(bossState = null) {
+function initBoss(isCrescendo) {
     DOMElements.bossArea.style.display = 'block';
-    DOMElements.bossArea.classList.remove('enraged');
+    DOMElements.bossArea.classList.remove('enraged', 'boss-active', 'crescendo-intro');
     gameState.bossIsEnraged = false;
+    gameState.sequenceTurnCounter = 0;
 
-    if (bossState) {
-        gameState.bossName = bossState.name;
-        gameState.bossLevel = bossState.level;
-        gameState.bossElement = bossState.element;
-        gameState.bossMaxHealth = bossState.maxHealth;
-        gameState.bossCurrentHealth = bossState.currentHealth;
+    if (isCrescendo) {
+        DOMElements.bossSymbol.textContent = '💀';
+        DOMElements.bossSymbol.classList.remove('hidden');
+        DOMElements.bossArea.classList.add('boss-active', 'crescendo-intro');
     } else {
-        gameState.bossName = BOSS_NAMES[Math.floor(Math.random() * BOSS_NAMES.length)];
-        gameState.bossLevel = Math.floor(Math.random() * 10) + 1;
-        gameState.bossElement = BOSS_ELEMENTS[Math.floor(Math.random() * BOSS_ELEMENTS.length)];
-        gameState.bossCurrentHealth = gameState.bossMaxHealth;
+        DOMElements.bossSymbol.classList.add('hidden');
     }
+
+    const bossLevel = gameState.currentWave;
+    const bossNameList = isCrescendo ? MENACING_BOSS_NAMES : BOSS_NAMES;
+    
+    gameState.bossName = bossNameList[Math.floor(Math.random() * bossNameList.length)];
+    gameState.bossLevel = bossLevel;
+    gameState.bossElement = BOSS_ELEMENTS[Math.floor(Math.random() * BOSS_ELEMENTS.length)];
+    
+    const baseHealth = isCrescendo ? 300 : 150;
+    gameState.bossMaxHealth = baseHealth + (bossLevel * 25);
+    gameState.bossCurrentHealth = gameState.bossMaxHealth;
+    
     DOMElements.bossName.textContent = gameState.bossName;
     DOMElements.bossLevel.textContent = `Lvl ${gameState.bossLevel}`;
-    DOMElements.bossArea.className = '';
     DOMElements.bossArea.classList.add(gameState.bossElement);
+
     updateBossHealth(gameState.bossCurrentHealth);
 }
 
 function hostCheckBossTrigger() {
-    if (!gameState.isHost || !gameState.bossMode || gameState.status !== 'playing') return;
+    if (gameState.status !== 'playing' || !gameState.bossMode) return;
+    
     gameState.sequenceTurnCounter++;
-    
-    if (localPlayer.combo >= 6 && localPlayer.combo < 9 && Math.random() < 0.3) {
-        applyBossAttack('rhythm_shift', localPlayer);
-        return;
-    }
-    if (remotePlayer && remotePlayer.combo >= 6 && remotePlayer.combo < 9 && Math.random() < 0.3) {
-        applyBossAttack('rhythm_shift', remotePlayer);
-        return;
-    }
-    
     const triggerInterval = gameState.bossIsEnraged ? 2 : 3;
-
     if(gameState.sequenceTurnCounter > 0 && gameState.sequenceTurnCounter % triggerInterval === 0) {
         triggerBossAction();
     }
@@ -554,15 +748,11 @@ function triggerBossAction() {
         setTimeout(() => DOMElements.bossArea.classList.remove('boss-healing'), 1000);
         const newHealth = Math.min(gameState.bossMaxHealth, gameState.bossCurrentHealth + 10);
         updateBossHealth(newHealth);
-        sendData({ type: 'boss_action', action: 'heal' });
-        sendData({ type: 'boss_health_update', newHealth: newHealth });
     } else {
-        const target = gameState.mode === 'multi' ? (Math.random() < 0.5 ? localPlayer : remotePlayer) : localPlayer;
-        if (!target) return;
+        const target = localPlayer;
         DOMElements.bossArea.classList.add('boss-acting');
         setTimeout(() => DOMElements.bossArea.classList.remove('boss-acting'), 1000);
         applyBossAttack(action, target);
-        if(gameState.mode === 'multi') sendData({ type: 'boss_action', action: action, targetId: target.id });
     }
 }
 
@@ -571,9 +761,7 @@ function showAttackAnnouncement(attackType, player, isDramatic = false) {
     if (!attackName || !player) return;
     const container = player.dom.attackAnnouncement;
 
-    if (isDramatic) {
-        container.classList.add('dramatic');
-    }
+    if (isDramatic) { container.classList.add('dramatic'); }
 
     container.innerHTML = '';
     attackName.split('').forEach((char, index) => {
@@ -586,9 +774,7 @@ function showAttackAnnouncement(attackType, player, isDramatic = false) {
     container.classList.add('visible');
     setTimeout(() => {
         container.classList.remove('visible');
-        if (isDramatic) {
-            container.classList.remove('dramatic');
-        }
+        if (isDramatic) { container.classList.remove('dramatic'); }
     }, 2500);
 }
 
@@ -631,7 +817,20 @@ function applyBossAttack(attackType, player) {
     }
 }
 
-function dealDamageToBoss(damage, player, isHeavyAttack = false) {
+function playDeathAnimation(isCrescendo) {
+    return new Promise(resolve => {
+        const duration = isCrescendo ? 1500 : 1000;
+        const container = DOMElements.bossHealthBarContainer;
+        container.classList.add(isCrescendo ? 'crescendo-defeated' : 'defeated');
+        
+        setTimeout(() => {
+            container.classList.remove('crescendo-defeated', 'defeated');
+            resolve();
+        }, duration);
+    });
+}
+
+async function dealDamageToBoss(damage, player, isHeavyAttack = false) {
     if (gameState.status !== 'playing') return;
 
     player.damageDealt += damage;
@@ -641,11 +840,16 @@ function dealDamageToBoss(damage, player, isHeavyAttack = false) {
     const newHealth = Math.max(0, gameState.bossCurrentHealth - damage);
     updateBossHealth(newHealth, isHeavyAttack);
 
-    if (gameState.mode === 'multi') sendData({ type: 'boss_health_update', newHealth: newHealth, isHeavy: isHeavyAttack });
-
     if (newHealth <= 0) {
-        const winner = gameState.mode === 'multi' ? `${localPlayer.name} & ${remotePlayer.name}` : localPlayer.name;
-        gameOver(`${winner} Victorious!`);
+        await playDeathAnimation(gameState.isCrescendoWave);
+        if (gameState.isCrescendoWave) {
+            if (rewardPlayer()) {
+                await showAnnouncement(DOMElements.rewardAnnouncement, '+1 LIFE', 1500);
+            }
+        }
+        startWave(gameState.currentWave + 1);
+    } else {
+        player.startNewSequence();
     }
 }
 
@@ -661,16 +865,13 @@ function updateBossHealth(health, isHeavy = false) {
 
     if (isHeavy) {
         DOMElements.bossHealthBarContainer.classList.add('heavy-shake');
-        
         const crack = document.createElement('div');
         crack.className = 'health-crack-effect';
         DOMElements.bossHealthBarContainer.appendChild(crack);
-
         setTimeout(() => {
             DOMElements.bossHealthBarContainer.classList.remove('heavy-shake');
             crack.remove();
         }, 500);
-
     } else {
         DOMElements.bossHealthBarContainer.classList.add('jiggle');
         setTimeout(() => DOMElements.bossHealthBarContainer.classList.remove('jiggle'), 300);
@@ -689,8 +890,11 @@ function transitionToGameArea() {
 
 function handleKeyPress(e) {
     if (gameState.status === 'gameover' || titleScreenActive) return;
-    const key = e.key || e;
-    if (!ARROW_KEYS.includes(key)) return;
+
+    const pressedKey = e.key;
+    const action = Object.keys(currentSettings.keyBinds).find(act => currentSettings.keyBinds[act] === pressedKey);
+
+    if (!action) return;
     
     if (gameState.status === 'setup') gameState.status = 'playing';
 
@@ -698,7 +902,7 @@ function handleKeyPress(e) {
     const player = localPlayer;
     if (!player || !player.currentSequence || player.currentSequence.length === 0) return;
 
-    if (key === player.currentSequence[player.sequenceProgress]) {
+    if (action === player.currentSequence[player.sequenceProgress]) {
         handleCorrectKeyPress(player);
     } else {
         handleFailure(player);
@@ -717,26 +921,21 @@ function handleCorrectKeyPress(player) {
     if (player.sequenceProgress === player.currentSequence.length) {
         player.successfulSequences++;
         player.updateCombo(player.combo + 1);
-
         player.dom.grid.classList.add('success-glow');
         setTimeout(() => player.dom.grid.classList.remove('success-glow'), 500);
-
+        
         if (gameState.bossMode) {
+            cancelAnimationFrame(player.timerId);
             if (player.combo > 0 && player.combo % 10 === 0) {
                 dealDamageToBoss(25, player, true);
             } else {
                 dealDamageToBoss(5, player, false);
             }
+        } else {
+            setTimeout(() => player.startNewSequence(), 300);
         }
-
-        setTimeout(() => {
-            player.startNewSequence();
-            if (gameState.mode === 'multi') {
-                sendData({ type: 'new_sequence', sequence: player.currentSequence, combo: player.combo });
-            } else {
-                hostCheckBossTrigger();
-            }
-        }, 300);
+        
+        hostCheckBossTrigger();
     }
 }
 
@@ -753,23 +952,18 @@ function handleFailure(player) {
     }
 
     if (player.lives <= 0) {
-        let winnerName;
+        let winnerName = gameState.mode === 'multi' ? (remotePlayer ? remotePlayer.name : 'Opponent') : null;
         if (gameState.bossMode) {
-            winnerName = `${gameState.bossName} Wins!`;
-        } else {
-            winnerName = gameState.mode === 'solo' ? null : (remotePlayer ? remotePlayer.name : 'Opponent');
+            winnerName = `Survived to Wave ${gameState.currentWave}`;
         }
         gameOver(winnerName);
-        if(gameState.mode === 'multi' && !gameState.bossMode) sendData({ type: 'game_over', winnerName: remotePlayer.name });
-        if(gameState.mode === 'multi' && gameState.bossMode) sendData({ type: 'game_over', winnerName: `${gameState.bossName} Wins!` });
+        if(gameState.mode === 'multi') sendData({ type: 'game_over', winnerName: remotePlayer.name });
 
     } else {
         setTimeout(() => {
             player.startNewSequence();
             if (gameState.mode === 'multi') {
                 sendData({ type: 'new_sequence', sequence: player.currentSequence, combo: player.combo });
-            } else {
-                hostCheckBossTrigger();
             }
         }, 300);
     }
@@ -788,19 +982,14 @@ function resetGame() {
     DOMElements.player1Container.classList.remove('is-local-player', 'is-remote-player');
     DOMElements.player2Container.classList.remove('is-local-player', 'is-remote-player');
 
-
     gameState.status = 'playing';
     gameState.sequenceTurnCounter = 0;
     gameState.bossIsEnraged = false;
+    gameState.currentWave = 1;
+    gameState.isCrescendoWave = false;
     
-    // --- FIX: Reset global touch state variables ---
     touchStartX = 0;
     touchStartY = 0;
-    // ---------------------------------------------
-
-    if(gameState.bossMode) {
-        initBoss();
-    }
 
     [localPlayer, remotePlayer].forEach(p => {
         if (p) {
@@ -809,24 +998,34 @@ function resetGame() {
             p.successfulSequences = 0;
             p.highestCombo = 0;
             p.damageDealt = 0;
+            p.speedBoostActive = false;
         }
     });
 
     if (gameState.mode === 'solo') {
-        localPlayer.startNewSequence();
+        if (gameState.bossMode) {
+            startWave(1);
+        } else {
+            localPlayer.startNewSequence();
+        }
     } else if (gameState.isHost) {
-        startCountdown(); // Start a new countdown for the rematch
+        startCountdown();
         sendData({type: 'start_countdown'});
     }
 }
 
 function gameOver(winnerName) {
+    if (gameState.status === 'gameover') return;
     gameState.status = 'gameover';
-    [localPlayer, remotePlayer].forEach(p => { if(p) cancelAnimationFrame(p.timerId) });
+    
+    [localPlayer, remotePlayer].forEach(p => { 
+        if(p) cancelAnimationFrame(p.timerId);
+    });
 
     const titleEl = DOMElements.gameOverTitle;
-    const titleText = 'GAME OVER';
-    titleEl.innerHTML = ''; // Clear previous title
+    titleEl.innerHTML = '';
+    
+    const titleText = gameState.bossMode ? 'RUN COMPLETE' : 'GAME OVER';
 
     titleText.split('').forEach((char, index) => {
         const span = document.createElement('span');
@@ -842,7 +1041,7 @@ function gameOver(winnerName) {
     } else {
         DOMElements.winnerNameDisplay.style.display = 'none';
     }
-
+    
     DOMElements.statsCombo.textContent = localPlayer.highestCombo;
     DOMElements.statsCleared.textContent = localPlayer.successfulSequences;
     if (gameState.bossMode) {
@@ -894,7 +1093,7 @@ function handleTouchStart(evt) {
 }
 
 function handleTouchMove(evt) {
-    evt.preventDefault(); // Prevent scrolling while swiping
+    evt.preventDefault();
 }
 
 function handleTouchEnd(evt) {
@@ -932,7 +1131,7 @@ function setVideoBackground() {
         return;
     }
 
-    const youtubeIdMatch = url.match(/(?:v=|youtu\.be\/|embed\/|watch\?v=|&v=)([^&?#]+)/);
+    const youtubeIdMatch = url.match(/(?:v=|youtu\.be\/|embed\/|watch?v=|&v=)([^&?#]+)/);
 
     if (youtubeIdMatch && youtubeIdMatch[1]) {
         const videoId = youtubeIdMatch[1];

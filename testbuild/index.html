@@ -15,10 +15,10 @@
 <body>
     <svg width="0" height="0" style="position:absolute">
         <defs>
-            <linearGradient id="grad-up" x1="0%" y1="100%" x2="0%" y2="0%"><stop offset="0%" style="stop-color:#2979FF;stop-opacity:1" /><stop offset="100%" style="stop-color:#82B1FF;stop-opacity:1" /></linearGradient>
-            <linearGradient id="grad-down" x1="0%" y1="0%" x2="0%" y2="100%"><stop offset="0%" style="stop-color:#FF1744;stop-opacity:1" /><stop offset="100%" style="stop-color:#FF8A80;stop-opacity:1" /></linearGradient>
-            <linearGradient id="grad-left" x1="100%" y1="0%" x2="0%" y2="0%"><stop offset="0%" style="stop-color:#7C4DFF;stop-opacity:1" /><stop offset="100%" style="stop-color:#B388FF;stop-opacity:1" /></linearGradient>
-            <linearGradient id="grad-right" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0%" style="stop-color:#00E676;stop-opacity:1" /><stop offset="100%" style="stop-color:#B9F6CA;stop-opacity:1" /></linearGradient>
+            <linearGradient id="grad-up" x1="0%" y1="100%" x2="0%" y2="0%"><stop id="grad-up-1" offset="0%" style="stop-color:#2979FF;stop-opacity:1" /><stop id="grad-up-2" offset="100%" style="stop-color:#82B1FF;stop-opacity:1" /></linearGradient>
+            <linearGradient id="grad-down" x1="0%" y1="0%" x2="0%" y2="100%"><stop id="grad-down-1" offset="0%" style="stop-color:#FF1744;stop-opacity:1" /><stop id="grad-down-2" offset="100%" style="stop-color:#FF8A80;stop-opacity:1" /></linearGradient>
+            <linearGradient id="grad-left" x1="100%" y1="0%" x2="0%" y2="0%"><stop id="grad-left-1" offset="0%" style="stop-color:#7C4DFF;stop-opacity:1" /><stop id="grad-left-2" offset="100%" style="stop-color:#B388FF;stop-opacity:1" /></linearGradient>
+            <linearGradient id="grad-right" x1="0%" y1="0%" x2="100%" y2="0%"><stop id="grad-right-1" offset="0%" style="stop-color:#00E676;stop-opacity:1" /><stop id="grad-right-2" offset="100%" style="stop-color:#B9F6CA;stop-opacity:1" /></linearGradient>
             <linearGradient id="grad-success" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" style="stop-color:#FFFF00;stop-opacity:1" /><stop offset="100%" style="stop-color:#FFEE58;stop-opacity:1" /></linearGradient>
         </defs>
     </svg>
@@ -35,12 +35,17 @@
             <p id="lobby-text"></p>
         </div>
 
+        <div id="reward-announcement" class="hidden"></div>
+        <div id="wave-announcement" class="hidden"></div>
+        <div id="warning-encounter" class="hidden">WARNING!!!</div>
+
         <button id="fullscreen-btn">
             <svg id="fullscreen-icon" viewBox="0 0 24 24"><path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 2h-2v3h-3v2h5v-5zm-3-4V5h-3v2h3v3z"></path></svg>
             <svg id="exit-fullscreen-icon" class="hidden" viewBox="0 0 24 24"><path d="M5 16h3v3h2v-5H5v2zm3-8H5v2h5V5H8v3zm6 11h2v-3h3v-2h-5v5zm2-11V5h-2v5h5V8h-3z"></path></svg>
         </button>
 
         <div id="connection-setup" class="glass-card">
+            <button id="settings-btn">⚙️</button>
             <h1>Sonostra</h1>
             <div class="input-group">
                 <input type="text" id="player-name-input" placeholder="Enter Your Name">
@@ -71,11 +76,17 @@
         <div id="game-area">
             <div id="boss-area" style="display: none;">
                 <div id="boss-info">
+                    <span id="boss-symbol" class="hidden"></span>
                     <span id="boss-name"></span>
                     <span id="boss-level"></span>
                 </div>
                 <div id="boss-health-bar-container">
                     <div id="boss-health-bar"></div>
+                    <div class="health-bar-shard" id="shard1"></div>
+                    <div class="health-bar-shard" id="shard2"></div>
+                    <div class="health-bar-shard" id="shard3"></div>
+                    <div class="health-bar-shard" id="shard4"></div>
+                    <div class="health-bar-shard" id="shard5"></div>
                 </div>
             </div>
             <div id="game-container">
@@ -122,6 +133,38 @@
             </div>
         </div>
     </div>
+
+    <div id="settings-screen" class="glass-card hidden">
+        <h1>Settings</h1>
+        
+        <div class="settings-section">
+            <h2>Controls</h2>
+            <div class="control-grid">
+                <div class="control-item"><label for="bind-up-btn">Up</label><button id="bind-up-btn">ArrowUp</button></div>
+                <div class="control-item"><label for="bind-down-btn">Down</label><button id="bind-down-btn">ArrowDown</button></div>
+                <div class="control-item"><label for="bind-left-btn">Left</label><button id="bind-left-btn">ArrowLeft</button></div>
+                <div class="control-item"><label for="bind-right-btn">Right</label><button id="bind-right-btn">ArrowRight</button></div>
+            </div>
+        </div>
+
+        <div class="settings-section">
+            <h2>Colors</h2>
+            <div class="color-grid">
+                <div class="color-item"><label for="color-up-input">Up Arrow</label><input type="color" id="color-up-input" value="#2979FF"></div>
+                <div class="color-item"><label for="color-down-input">Down Arrow</label><input type="color" id="color-down-input" value="#FF1744"></div>
+                <div class="color-item"><label for="color-left-input">Left Arrow</label><input type="color" id="color-left-input" value="#7C4DFF"></div>
+                <div class="color-item"><label for="color-right-input">Right Arrow</label><input type="color" id="color-right-input" value="#00E676"></div>
+                <div class="color-item"><label for="color-grid-input">Grid BG</label><input type="color" id="color-grid-input" value="#161616"></div>
+            </div>
+        </div>
+
+        <div class="button-group">
+            <button id="save-settings-btn" class="btn btn-primary">Save</button>
+            <button id="defaults-settings-btn" class="btn btn-secondary">Load Defaults</button>
+            <button id="close-settings-btn" class="btn btn-secondary">Close</button>
+        </div>
+    </div>
+
 
     <div id="popup-chat-container">
         <div id="chat-bubbles"></div>

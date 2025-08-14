@@ -93,7 +93,59 @@ body {
 #game-overlay {
     width: 100%; height: 100%; padding: 2rem;
     display: flex; flex-direction: column; align-items: center; justify-content: center;
+    position: relative;
 }
+
+/* Announcement Banner Styles */
+#wave-announcement, #warning-encounter, #reward-announcement {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-family: var(--font-title);
+    color: white;
+    z-index: 300;
+    pointer-events: none;
+    opacity: 0;
+}
+#wave-announcement {
+    font-size: clamp(3rem, 10vw, 6rem);
+    text-shadow: 0 0 15px white, 0 0 30px var(--primary-color);
+    animation: fade-in-out-zoom 2s ease-in-out forwards;
+}
+#reward-announcement {
+    font-size: clamp(2rem, 8vw, 4rem);
+    text-shadow: 0 0 15px var(--success-color);
+    color: var(--success-color);
+    animation: fade-in-out-zoom 1.5s ease-in-out forwards;
+}
+#warning-encounter {
+    font-size: clamp(3rem, 12vw, 7rem);
+    color: var(--danger-color);
+    animation: pulse-warning 2.5s ease-in-out forwards;
+}
+.hidden {
+    display: none !important;
+}
+@keyframes fade-in-out-zoom {
+    0% { opacity: 0; transform: translate(-50%, -50%) scale(0.8); }
+    20% { opacity: 1; transform: translate(-50%, -50%) scale(1.1); }
+    80% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+    100% { opacity: 0; transform: translate(-50%, -50%) scale(0.9); }
+}
+@keyframes pulse-warning {
+    0% { opacity: 0; transform: translate(-50%, -50%) scale(0.9); }
+    20% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+    35% { text-shadow: 0 0 30px var(--danger-color); }
+    50% { text-shadow: 0 0 15px var(--danger-color); }
+    65% { text-shadow: 0 0 30px var(--danger-color); }
+    80%, 100% { 
+        opacity: 0; 
+        transform: translate(-50%, -50%) scale(0.9);
+        text-shadow: 0 0 15px var(--danger-color);
+    }
+}
+
 
 #fullscreen-btn {
     position: absolute;
@@ -136,11 +188,33 @@ body {
     pointer-events: none;
     transform: scale(0.95) translateY(20px);
     transition: opacity 0.6s ease-out, transform 0.6s ease-out;
+    position: relative; /* For settings button */
 }
 #connection-setup.visible {
     opacity: 1;
     pointer-events: auto;
     transform: scale(1) translateY(0);
+}
+#settings-btn {
+    position: absolute;
+    top: 1rem;
+    right: 1rem;
+    width: 35px;
+    height: 35px;
+    background: rgba(0,0,0,0.2);
+    border: 1px solid var(--glass-border);
+    border-radius: 50%;
+    font-size: 1.5rem;
+    color: white;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.2s, transform 0.2s;
+}
+#settings-btn:hover {
+    background: rgba(0,0,0,0.4);
+    transform: rotate(45deg);
 }
 #connection-setup h1 {
     font-family: var(--font-title);
@@ -196,6 +270,95 @@ body {
 .btn-secondary { background: #444; color: #ccc; }
 .btn-secondary:hover { background: #555; }
 
+/* --- Settings Screen --- */
+#settings-screen {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 90%;
+    max-width: 600px;
+    z-index: 500;
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+#settings-screen.hidden { display: none; }
+#settings-screen h1 {
+    font-family: var(--font-title);
+    text-align: center;
+    font-size: 3rem;
+}
+.settings-section {
+    padding: 1rem;
+    background: rgba(0,0,0,0.2);
+    border-radius: 12px;
+}
+.settings-section h2 {
+    font-family: var(--font-display);
+    margin-bottom: 1rem;
+    text-align: center;
+    color: var(--primary-color);
+}
+.control-grid, .color-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1rem;
+}
+.control-item, .color-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.5rem;
+}
+.control-item label, .color-item label {
+    font-weight: 500;
+    color: #ccc;
+}
+.control-item button {
+    width: 100%;
+    padding: 0.75rem;
+    font-size: 1rem;
+    font-weight: 700;
+    font-family: var(--font-display);
+    background: rgba(0,0,0,0.3);
+    border: 1px solid var(--glass-border);
+    border-radius: 8px;
+    color: var(--text-color);
+    cursor: pointer;
+    transition: all 0.2s;
+}
+.control-item button:hover {
+    border-color: var(--primary-color);
+    color: var(--primary-color);
+}
+.control-item button.listening {
+    border-color: var(--danger-color);
+    color: var(--danger-color);
+    animation: pulse-red 1s infinite;
+}
+
+input[type="color"] {
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
+    width: 100%;
+    height: 40px;
+    background-color: transparent;
+    border: 1px solid var(--glass-border);
+    border-radius: 8px;
+    cursor: pointer;
+}
+input[type="color"]::-webkit-color-swatch {
+    border-radius: 6px;
+    border: none;
+}
+input[type="color"]::-moz-color-swatch {
+    border-radius: 6px;
+    border: none;
+}
+
+
 /* --- Lobby Overlay --- */
 #lobby-overlay {
     position: fixed;
@@ -231,23 +394,23 @@ body {
 .player-name { font-family: var(--font-display); font-size: 1.5rem; font-weight: 700; }
 .player-lives { display: flex; gap: 0.5rem; }
 .life-heart { width: 24px; height: 24px; color: var(--danger-color); filter: drop-shadow(0 0 5px var(--danger-color)); }
-.game-grid { width: 100%; height: 200px; position: relative; overflow: hidden; transition: box-shadow 0.3s, filter 0.2s, transform 0.3s ease-out; -webkit-tap-highlight-color: transparent; }
+.game-grid { width: 100%; height: 200px; position: relative; overflow: hidden; transition: box-shadow 0.3s, filter 0.2s, transform 0.3s ease-out, background-color 0.3s; -webkit-tap-highlight-color: transparent; }
 .sequence-container {
     position: absolute;
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%);
     display: flex;
-    gap: var(--arrow-gap, 1rem); /* Use variable with fallback */
-    transition: transform 0.2s ease-in-out, gap 0.3s ease-in-out; /* Added gap transition */
+    gap: var(--arrow-gap, 1rem);
+    transition: transform 0.2s ease-in-out, gap 0.3s ease-in-out;
     pointer-events: none;
 }
 
 .arrow-icon {
-    width: var(--arrow-size, 64px); /* Use variable with fallback */
-    height: var(--arrow-size, 64px); /* Use variable with fallback */
+    width: var(--arrow-size, 64px);
+    height: var(--arrow-size, 64px);
     opacity: 1;
-    transition: opacity 0.3s, transform 0.3s, width 0.3s ease-in-out, height 0.3s ease-in-out; /* Added size transition */
+    transition: opacity 0.3s, transform 0.3s, width 0.3s ease-in-out, height 0.3s ease-in-out;
     filter: drop-shadow(0 0 5px rgba(0,0,0,0.5));
     pointer-events: none;
 }
@@ -273,6 +436,19 @@ body {
     50% { box-shadow: 0 0 25px rgba(244, 67, 54, 1); }
     100% { box-shadow: 0 0 10px rgba(244, 67, 54, 0.5); }
 }
+
+/* --- Combo Fever System --- */
+.game-grid.combo-fever {
+    --glow-color: var(--primary-color);
+    --glow-size: 25px;
+    animation: pulse-glow 1.5s infinite ease-in-out;
+}
+@keyframes pulse-glow {
+    50% {
+        box-shadow: 0 0 var(--glow-size) var(--glow-color), 0 0 calc(var(--glow-size) / 2) var(--glow-color) inset;
+    }
+}
+
 
 .game-grid.attack-launch { animation: attack-launch 0.4s ease-out; }
 @keyframes attack-launch {
@@ -372,7 +548,7 @@ body {
     position: absolute; bottom: 2rem;
     width: 100%; max-width: 500px;
     left: 50%; transform: translateX(-50%);
-    z-index: 201; /* Raised to appear above game-over screen */
+    z-index: 201;
     display: flex;
     gap: 0.5rem;
 }
@@ -450,16 +626,18 @@ body {
 #game-over-screen.visible #winner-name-display {
     opacity: 1;
     animation: glimmer 2.5s infinite;
-    animation-delay: 1s; /* Start after letters fall */
+    animation-delay: 1s;
 }
 #game-over-content .btn {
-    pointer-events: all;
     opacity: 0;
     animation-fill-mode: forwards;
 }
+#game-over-screen.visible #game-over-content .btn {
+    pointer-events: all;
+}
 #game-over-screen.visible .btn {
     animation: fade-in 1s ease forwards;
-    animation-delay: 1.2s; /* Start after winner name appears */
+    animation-delay: 1.2s;
 }
 #post-game-stats {
     display: flex;
@@ -511,18 +689,9 @@ body {
     to { opacity: 1; transform: translateY(0); }
 }
 @keyframes glimmer {
-    0% {
-        color: white;
-        text-shadow: 0 0 10px rgba(255, 255, 255, 0.7);
-    }
-    50% {
-        color: #FFEB3B;
-        text-shadow: 0 0 20px #FFEB3B, 0 0 30px #FFC107;
-    }
-    100% {
-        color: white;
-        text-shadow: 0 0 10px rgba(255, 255, 255, 0.7);
-    }
+    0% { color: white; text-shadow: 0 0 10px rgba(255, 255, 255, 0.7); }
+    50% { color: #FFEB3B; text-shadow: 0 0 20px #FFEB3B, 0 0 30px #FFC107; }
+    100% { color: white; text-shadow: 0 0 10px rgba(255, 255, 255, 0.7); }
 }
 @keyframes fade-in {
     to { opacity: 1; }
@@ -536,26 +705,37 @@ body {
     text-align: center;
     font-family: var(--font-display);
     transition: transform 0.2s, filter 0.5s;
+    position: relative;
+}
+#boss-area.crescendo-intro {
+    animation: crescendo-intro-anim 1s cubic-bezier(0.68, -0.55, 0.27, 1.55) forwards;
 }
 #boss-area.boss-acting { animation: boss-lunge-attack 1s; }
 #boss-area.boss-healing { animation: boss-lunge-heal 1s; }
 #boss-area.enraged {
     animation: pulse-enraged 1.2s infinite ease-in-out;
 }
+@keyframes crescendo-intro-anim {
+    0% { transform: translateY(-150%); opacity: 0; }
+    70% { transform: translateY(10%); opacity: 1; }
+    100% { transform: translateY(0); opacity: 1; }
+}
 @keyframes pulse-enraged {
-    50% {
-        filter: drop-shadow(0 0 25px var(--danger-color));
-        transform: scale(1.02);
-        box-shadow: inset 0 0 20px rgba(244, 67, 54, 0.5);
-    }
+    50% { filter: drop-shadow(0 0 25px var(--danger-color)); transform: scale(1.02); box-shadow: inset 0 0 20px rgba(244, 67, 54, 0.5); }
 }
 
 #boss-info {
     display: flex;
     justify-content: space-between;
-    align-items: baseline;
+    align-items: center;
     padding: 0 0.5rem;
     margin-bottom: 0.5rem;
+}
+#boss-symbol {
+    font-size: 1.5rem;
+    margin-right: 0.5rem;
+    color: var(--danger-color);
+    text-shadow: 0 0 10px var(--danger-color);
 }
 #boss-name {
     font-size: 2rem;
@@ -576,16 +756,74 @@ body {
     border: 2px solid var(--glass-border);
     border-radius: 15px;
     padding: 4px;
-    position: relative; /* Needed for crack effect */
-    overflow: hidden;   /* Needed for crack effect */
+    position: relative;
+    overflow: hidden;
+    transition: transform 0.3s ease-out, height 0.3s ease-out;
+}
+#boss-area.boss-active #boss-health-bar-container {
+    transform: scale(1.1);
+    height: 40px;
 }
 #boss-health-bar {
     width: 100%;
     height: 100%;
     background: linear-gradient(90deg, var(--danger-color), var(--secondary-color));
     border-radius: 10px;
-    transition: width 0.5s ease-out;
+    transition: width 0.5s ease-out, background 0.3s ease-out;
 }
+#boss-area.boss-active #boss-health-bar {
+    background: linear-gradient(90deg, #FFC107, #F44336);
+}
+
+/* Health Bar Defeat Animations */
+.health-bar-shard {
+    position: absolute;
+    top: 0; bottom: 0;
+    background: inherit;
+    opacity: 0;
+    border-radius: 10px;
+}
+#boss-health-bar-container.defeated #boss-health-bar,
+#boss-health-bar-container.crescendo-defeated #boss-health-bar {
+    opacity: 0;
+}
+/* Echo Defeat */
+#boss-health-bar-container.defeated #shard1 {
+    left: 0; right: 50%;
+    opacity: 1;
+    animation: break-and-fall-left 1s forwards;
+}
+#boss-health-bar-container.defeated #shard2 {
+    left: 50%; right: 0;
+    opacity: 1;
+    animation: break-and-fall-right 1s forwards;
+}
+@keyframes break-and-fall-left {
+    to { transform: rotate(-10deg) translate(-50px, 100px); opacity: 0; }
+}
+@keyframes break-and-fall-right {
+    to { transform: rotate(10deg) translate(50px, 100px); opacity: 0; }
+}
+/* Crescendo Defeat */
+#boss-health-bar-container.crescendo-defeated .health-bar-shard {
+    opacity: 1;
+    animation-duration: 1.5s;
+    animation-fill-mode: forwards;
+}
+#boss-health-bar-container.crescendo-defeated #shard1 { left: 0; width: 20%; animation-name: crescendo-shatter1; }
+#boss-health-bar-container.crescendo-defeated #shard2 { left: 20%; width: 20%; animation-name: crescendo-shatter2; }
+#boss-health-bar-container.crescendo-defeated #shard3 { left: 40%; width: 20%; animation-name: crescendo-shatter3; }
+#boss-health-bar-container.crescendo-defeated #shard4 { left: 60%; width: 20%; animation-name: crescendo-shatter4; }
+#boss-health-bar-container.crescendo-defeated #shard5 { left: 80%; width: 20%; animation-name: crescendo-shatter5; }
+
+@keyframes crescendo-shatter1 { to { transform: translate(-150px, 100px) rotate(-35deg); opacity: 0; } }
+@keyframes crescendo-shatter2 { to { transform: translate(-50px, 200px) rotate(-15deg); opacity: 0; } }
+@keyframes crescendo-shatter3 { to { transform: translate(0, 250px) rotate(0deg); opacity: 0; } }
+@keyframes crescendo-shatter4 { to { transform: translate(50px, 200px) rotate(15deg); opacity: 0; } }
+@keyframes crescendo-shatter5 { to { transform: translate(150px, 100px) rotate(35deg); opacity: 0; } }
+
+
+
 @keyframes boss-lunge-attack { 
     25% { transform: translateY(-10px) scale(1.03); filter: drop-shadow(0 0 15px var(--danger-color)); }
     50% { transform: translateY(0) scale(1); }
@@ -597,7 +835,6 @@ body {
     75% { transform: translateY(-10px) scale(1.03); filter: drop-shadow(0 0 15px var(--success-color)); }
 }
 
-/* --- Boss Health Bar Animations --- */
 #boss-health-bar-container.jiggle { animation: jiggle 0.3s; }
 @keyframes jiggle {
   0%, 100% { transform: translateX(0); }
@@ -605,7 +842,6 @@ body {
   50% { transform: translateX(3px); }
   75% { transform: translateX(-3px); }
 }
-
 #boss-health-bar-container.heavy-shake { animation: heavy-shake 0.5s; }
 @keyframes heavy-shake {
   0%, 100% { transform: translate(0, 0) rotate(0); }
@@ -614,28 +850,19 @@ body {
   30%, 50%, 70% { transform: translate(-8px, 4px) rotate(-1deg); }
   40%, 60% { transform: translate(8px, 0) rotate(1deg); }
 }
-
 .health-crack-effect {
     position: absolute;
-    top: 0;
-    right: 0;
-    bottom: 0;
-    left: 0;
+    top: 0; right: 0; bottom: 0; left: 0;
     background: linear-gradient(115deg, transparent 48%, rgba(255,255,255,0.7) 50%, transparent 52%);
     animation: crack-fade 0.4s;
     opacity: 0;
 }
-@keyframes crack-fade {
-    50% { opacity: 1; }
-}
+@keyframes crack-fade { 50% { opacity: 1; } }
 
 
 /* --- Boss Attack Effects --- */
 .attack-announcement {
-    position: absolute;
-    top: 25%;
-    left: 50%;
-    transform: translateX(-50%);
+    position: absolute; top: 25%; left: 50%; transform: translateX(-50%);
     z-index: 50;
     font-family: var(--font-title);
     font-size: 2.5rem;
@@ -644,11 +871,7 @@ body {
     opacity: 0;
     pointer-events: none;
 }
-.attack-announcement.dramatic {
-    font-size: 5rem;
-    color: var(--danger-color);
-    text-shadow: 0 0 20px var(--danger-color);
-}
+.attack-announcement.dramatic { font-size: 5rem; color: var(--danger-color); text-shadow: 0 0 20px var(--danger-color); }
 .attack-announcement.visible { opacity: 1; }
 .attack-announcement .char {
     display: inline-block;
@@ -677,17 +900,13 @@ body {
 
 
 .timer-effect {
-    position: absolute;
-    top: 0; left: 0;
+    position: absolute; top: 0; left: 0;
     width: 100%; height: 100%;
     border-radius: 5px;
     opacity: 0;
     pointer-events: none;
 }
-.timer-effect.visible {
-    animation: effect-fade-out 0.5s 0.5s forwards;
-    opacity: 1;
-}
+.timer-effect.visible { animation: effect-fade-out 0.5s 0.5s forwards; opacity: 1; }
 .timer-fire-effect { background: linear-gradient(to top, #ff4800, transparent); animation-name: flicker; animation-duration: 0.1s; animation-iteration-count: 5; }
 .timer-poison-effect { background: radial-gradient(circle, #76ff03 10%, transparent 70%); animation-name: bubble; animation-duration: 0.5s; animation-iteration-count: 1; }
 .timer-ice-effect { box-shadow: inset 0 0 10px #40c4ff; border: 1px solid #40c4ff; animation-name: ice-crack; animation-duration: 0.5s; animation-iteration-count: 1;}
@@ -699,61 +918,25 @@ body {
 
 /* --- Mobile Responsive Styles --- */
 @media (max-width: 768px) {
-    #game-container {
-        flex-direction: column;
-        justify-content: flex-start;
-        gap: 1rem;
-        padding-top: 1rem;
-    }
-    #boss-area {
-        margin-bottom: 0.5rem;
-        width: 100%;
-    }
+    #game-container { flex-direction: column; justify-content: flex-start; gap: 1rem; padding-top: 1rem; }
+    #boss-area { margin-bottom: 0.5rem; width: 100%; }
     #boss-name { font-size: 1.5rem; }
+    #boss-symbol { font-size: 1.2rem; }
     #connection-setup h1 { font-size: 2.5rem; }
     .attack-announcement.dramatic { font-size: 3.5rem; }
-
-    .game-grid.blurred { 
-        filter: blur(5px); /* Adaptive Blur */
-    }
-
-    /* Make the grid a flex container to handle centering of the sequence */
-    .game-grid {
-        display: flex;
-        align-items: center;
-        justify-content: center;
-    }
-
-    /* Change the sequence container's positioning to be constrained */
-    .sequence-container {
-        position: relative; /* No longer absolute */
-        top: auto;
-        left: auto;
-        transform: none;    /* Remove the transform */
-        max-width: 100%;    /* This is the magic: it cannot overflow! */
-        justify-content: center; /* Ensures arrows are centered within the now-constrained container */
-    }
-
-    /* Compact Remote Player View */
-    .player-area.is-remote-player {
-        order: 2; /* Ensure remote player is always at the bottom */
-        flex: 0;
-        padding: 0.5rem;
-        border: 1px solid var(--glass-border);
-        border-radius: 12px;
-        background: rgba(0,0,0,0.2);
-    }
-    .player-area.is-local-player {
-        order: 1;
-    }
-    .is-remote-player .game-grid,
-    .is-remote-player .timer-bar-container,
-    .is-remote-player .combo-counter-container,
-    .is-remote-player .attack-announcement {
-        display: none;
-    }
+    .game-grid.blurred { filter: blur(5px); }
+    .game-grid { display: flex; align-items: center; justify-content: center; }
+    .sequence-container { position: relative; top: auto; left: auto; transform: none; max-width: 100%; justify-content: center; }
+    .player-area.is-remote-player { order: 2; flex: 0; padding: 0.5rem; border: 1px solid var(--glass-border); border-radius: 12px; background: rgba(0,0,0,0.2); }
+    .player-area.is-local-player { order: 1; }
+    .is-remote-player .game-grid, .is-remote-player .timer-bar-container, .is-remote-player .combo-counter-container, .is-remote-player .attack-announcement { display: none; }
     .is-remote-player .player-header { padding: 0;}
     .is-remote-player .player-name { font-size: 1.2rem; }
     .is-remote-player .life-heart { width: 20px; height: 20px; }
     #chat-input-container { bottom: 1rem; }
+    #game-over-screen { padding-top: 5vh; }
+    #game-over-title { font-size: 3.5rem; }
+    #winner-name-display { font-size: 1.5rem; }
+    #post-game-stats { gap: 1rem; padding: 0.75rem 1rem; }
+    .stat-value { font-size: 1.5rem; }
 }

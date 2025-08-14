@@ -199,6 +199,7 @@ const gameState = {
     isHost: false,
     mode: 'solo',
     bossMode: false,
+    isTransitioning: false, // Flag to prevent wave skipping
     currentWave: 1,
     isCrescendoWave: false,
     bossIsEnraged: false,
@@ -329,7 +330,6 @@ class Player {
         this.displaySequence();
         this.startTimer();
 
-        // If this is the local player in a multiplayer game, send the new sequence to the opponent.
         if (this.isLocal && gameState.mode === 'multi' && conn) {
             sendData({ type: 'new_sequence', sequence: this.currentSequence, combo: this.combo });
         }
@@ -340,27 +340,20 @@ class Player {
         const grid = this.dom.grid;
         const container = this.dom.sequenceContainer;
     
-        // Use the grid's actual width, minus some padding for safety
         const availableWidth = grid.offsetWidth - 40; 
         
-        // Define a max and min size for the arrows to keep them reasonable
         const maxArrowSize = 80;
         const minArrowSize = 35;
     
-        // Calculate the ideal size based on available space, assuming a small initial gap
         let idealSize = (availableWidth / sequenceLength) - 10; 
     
-        // Clamp the size between our min and max values
         let finalArrowSize = Math.max(minArrowSize, Math.min(idealSize, maxArrowSize));
     
-        // Set a gap proportional to the final size for a clean look
         let finalArrowGap = finalArrowSize * 0.15;
     
-        // Apply the calculated sizes via CSS variables
         container.style.setProperty('--arrow-size', `${finalArrowSize}px`);
         container.style.setProperty('--arrow-gap', `${finalArrowGap}px`);
     
-        // The rest of the function remains the same
         container.innerHTML = '';
         this.currentSequence.forEach(arrowKey => {
             container.innerHTML += ARROW_SVG[arrowKey];
@@ -645,6 +638,12 @@ function setupConnection() {
                     startWave(data.wave);
                 }
                 break;
+            // --- NEW CASE FOR SYNCED BOSS ATTACKS ---
+            case 'boss_attack':
+                if (!gameState.isHost) {
+                    applyBossAttack(data.attackType, localPlayer);
+                }
+                break;
         }
     });
 }
@@ -661,14 +660,12 @@ function showAnnouncement(element, text, duration) {
     });
 }
 
-// --- CORRECTED FUNCTION FOR WAVE SYNC ---
 async function startWave(waveNumber) {
     gameState.currentWave = waveNumber;
     gameState.isCrescendoWave = gameState.currentWave % 3 === 0;
 
     DOMElements.bossArea.classList.remove('crescendo-intro');
 
-    // This logic now runs for BOTH players to keep announcements and boss UI in sync.
     if (gameState.isCrescendoWave) {
         await showAnnouncement(DOMElements.warningEncounter, 'WARNING!!!', 2500);
         initBoss(true);
@@ -679,13 +676,14 @@ async function startWave(waveNumber) {
         initBoss(false);
     }
     
-    // The local player on EACH machine gets a new sequence.
     localPlayer.startNewSequence();
 
-    // The HOST is responsible for TELLING the client to run this function.
     if (gameState.isHost && gameState.mode === 'multi' && conn) {
         sendData({ type: 'wave_change', wave: waveNumber });
     }
+    
+    // Unlock the transition state after the wave has started
+    gameState.isTransitioning = false;
 }
 
 function rewardPlayer() {
@@ -720,7 +718,6 @@ function startCountdown() {
                 setVideoBackground();
                 
                 if (gameState.bossMode) {
-                    // Host kicks off the first wave
                     if (gameState.isHost) {
                         startWave(1);
                     }
@@ -775,6 +772,7 @@ function hostCheckBossTrigger() {
     }
 }
 
+// --- MODIFIED FUNCTION FOR SYNCED BOSS ATTACKS ---
 function triggerBossAction() {
     const action = BOSS_ACTIONS[Math.floor(Math.random() * BOSS_ACTIONS.length)];
     
@@ -784,10 +782,22 @@ function triggerBossAction() {
         const newHealth = Math.min(gameState.bossMaxHealth, gameState.bossCurrentHealth + 10);
         updateBossHealth(newHealth);
     } else {
-        const target = localPlayer;
+        let target = localPlayer;
+        // In multiplayer, 50% chance to target the other player
+        if (remotePlayer && Math.random() < 0.5) {
+            target = remotePlayer;
+        }
+
         DOMElements.bossArea.classList.add('boss-acting');
         setTimeout(() => DOMElements.bossArea.classList.remove('boss-acting'), 1000);
-        applyBossAttack(action, target);
+        
+        if (target.isLocal) {
+            // Apply attack to self (the host)
+            applyBossAttack(action, target);
+        } else {
+            // Send command to client to apply attack
+            sendData({ type: 'boss_attack', attackType: action });
+        }
     }
 }
 
@@ -865,8 +875,9 @@ function playDeathAnimation(isCrescendo) {
     });
 }
 
+// --- MODIFIED FUNCTION TO PREVENT WAVE SKIPPING ---
 async function dealDamageToBoss(damage, player, isHeavyAttack = false) {
-    if (gameState.status !== 'playing') return;
+    if (gameState.status !== 'playing' || gameState.isTransitioning) return;
 
     player.damageDealt += damage;
     player.dom.grid.classList.add('attack-launch');
@@ -876,6 +887,8 @@ async function dealDamageToBoss(damage, player, isHeavyAttack = false) {
     updateBossHealth(newHealth, isHeavyAttack);
 
     if (newHealth <= 0) {
+        // Lock the state to prevent multiple wave transitions
+        gameState.isTransitioning = true; 
         await playDeathAnimation(gameState.isCrescendoWave);
         if (gameState.isCrescendoWave) {
             if (rewardPlayer()) {
@@ -1025,6 +1038,7 @@ function resetGame() {
     DOMElements.player2Container.classList.remove('is-local-player', 'is-remote-player');
 
     gameState.status = 'playing';
+    gameState.isTransitioning = false;
     gameState.sequenceTurnCounter = 0;
     gameState.bossIsEnraged = false;
     gameState.currentWave = 1;

@@ -226,7 +226,7 @@ const gameState = {
     mode: 'solo',
     bossMode: false,
     isTransitioning: false,
-    pendingNextWave: false, // Flag for wave sync
+    pendingNextWave: false,
     currentWave: 1,
     isCrescendoWave: false,
     bossIsEnraged: false,
@@ -244,7 +244,7 @@ class Player {
         this.id = id;
         this.name = name;
         this.isLocal = isLocal;
-        this.isIdle = true; // Flag for wave sync
+        this.isIdle = true;
         this.level = 0;
         this.lives = 3;
         this.combo = 0;
@@ -967,10 +967,9 @@ async function dealDamageToBoss(damage, player, isHeavyAttack = false) {
         gameState.isTransitioning = true; 
         await playDeathAnimation(gameState.isCrescendoWave);
         
-        // Wait for remote player to be idle before proceeding
         if (remotePlayer && !remotePlayer.isIdle) {
             gameState.pendingNextWave = true;
-            return; // Stop here and wait for the player_state_update message
+            return;
         }
 
         if (gameState.isCrescendoWave) {
@@ -1071,7 +1070,6 @@ function handleCorrectKeyPress(player) {
                 dealDamageToBoss(damageType === 'heavy' ? 25 : 5, player, damageType === 'heavy');
             } else {
                 sendData({ type: 'damage_boss', damageType: damageType });
-                // Don't start a new sequence if a wave transition is happening
                 if (!gameState.pendingNextWave) {
                     player.startNewSequence();
                 }
@@ -1113,7 +1111,6 @@ function handleFailure(player) {
 
     } else {
         setTimeout(() => {
-            // Don't start a new sequence if a wave transition is happening
             if (!gameState.pendingNextWave) {
                 player.startNewSequence();
             }
@@ -1131,8 +1128,6 @@ function handleRemoteKeyPress(progress) {
 function resetGame() {
     if (!localPlayer) return;
     DOMElements.gameOverScreen.classList.remove('visible');
-    DOMElements.player1Container.classList.remove('is-local-player', 'is-remote-player');
-    DOMElements.player2Container.classList.remove('is-local-player', 'is-remote-player');
 
     gameState.status = 'playing';
     gameState.isTransitioning = false;

@@ -514,8 +514,6 @@ input[type="color"]::-moz-color-swatch {
     opacity: 0;
     transform: translateY(10px);
     transition: opacity 0.3s, transform 0.3s;
-    position: relative;
-    margin-top: -1rem; /* Adjust to make space for fever text */
 }
 .combo-counter-container.visible {
     opacity: 1;
@@ -546,16 +544,18 @@ input[type="color"]::-moz-color-swatch {
 
 .fever-text {
     font-family: var(--font-title);
-    font-size: 1.25rem;
+    font-size: 1.5rem;
     font-weight: 700;
-    letter-spacing: 2px;
+    letter-spacing: 3px;
+    height: 1.5rem; /* Reserve space to prevent layout shift */
+    margin-bottom: 0.5rem;
     background: linear-gradient(90deg, #ff0000, #ff7f00, #ffff00, #00ff00, #0000ff, #4b0082, #9400d3);
-    background-size: 200% 200%;
+    background-size: 300% 300%;
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
-    animation: rainbow-shift 3s ease infinite;
-    margin-bottom: 0.25rem;
+    animation: rainbow-shift 2s ease-in-out infinite;
 }
+
 @keyframes rainbow-shift {
     0%{background-position:0% 50%}
     50%{background-position:100% 50%}

@@ -1,3 +1,29 @@
+// --- NEW HELPER FUNCTIONS FOR PLAYER LEVEL ---
+function loadPlayerData() {
+    const saved = localStorage.getItem('sonostraPlayerData');
+    if (saved) {
+        return JSON.parse(saved);
+    }
+    return { highestWave: 0 }; // Default data if none is saved
+}
+
+function savePlayerData(data) {
+    localStorage.setItem('sonostraPlayerData', JSON.stringify(data));
+}
+
+function triggerLevelUpEffect() {
+    const levelUpSound = new Audio('https://www.sonostra.com/levelup.mp3');
+    levelUpSound.play();
+
+    // Show the local player's specific level up text
+    const announcement = localPlayer.dom.levelupText;
+    announcement.classList.remove('hidden');
+    setTimeout(() => {
+        announcement.classList.add('hidden');
+    }, 2500);
+}
+
+
 const DOMElements = {
     titleScreen: document.getElementById('title-screen'),
     connectionSetup: document.getElementById('connection-setup'),
@@ -23,6 +49,7 @@ const DOMElements = {
     winnerNameDisplay: document.getElementById('winner-name-display'),
     rematchBtn: document.getElementById('rematch-btn'),
     bossArea: document.getElementById('boss-area'),
+    bossSymbol: document.getElementById('boss-symbol'),
     bossName: document.getElementById('boss-name'),
     bossLevel: document.getElementById('boss-level'),
     bossHealthBar: document.getElementById('boss-health-bar'),
@@ -36,10 +63,139 @@ const DOMElements = {
     damageStatContainer: document.getElementById('damage-stat-container'),
     nextVideoInput: document.getElementById('next-video-input'),
     changeVideoBtn: document.getElementById('change-video-btn'),
+    lobbyOverlay: document.getElementById('lobby-overlay'),
+    lobbyText: document.getElementById('lobby-text'),
+    waveAnnouncement: document.getElementById('wave-announcement'),
+    warningEncounter: document.getElementById('warning-encounter'),
+    rewardAnnouncement: document.getElementById('reward-announcement'),
+    settingsBtn: document.getElementById('settings-btn'),
+    settingsScreen: document.getElementById('settings-screen'),
+    bindUpBtn: document.getElementById('bind-up-btn'),
+    bindDownBtn: document.getElementById('bind-down-btn'),
+    bindLeftBtn: document.getElementById('bind-left-btn'),
+    bindRightBtn: document.getElementById('bind-right-btn'),
+    colorUpInput: document.getElementById('color-up-input'),
+    colorDownInput: document.getElementById('color-down-input'),
+    colorLeftInput: document.getElementById('color-left-input'),
+    colorRightInput: document.getElementById('color-right-input'),
+    colorGridInput: document.getElementById('color-grid-input'),
+    saveSettingsBtn: document.getElementById('save-settings-btn'),
+    defaultsSettingsBtn: document.getElementById('defaults-settings-btn'),
+    closeSettingsBtn: document.getElementById('close-settings-btn'),
 };
 
+// --- Settings Management ---
+const defaultSettings = {
+    playerName: '',
+    keyBinds: { ArrowUp: 'ArrowUp', ArrowDown: 'ArrowDown', ArrowLeft: 'ArrowLeft', ArrowRight: 'ArrowRight' },
+    colors: { up: '#2979FF', down: '#FF1744', left: '#7C4DFF', right: '#00E676', grid: '#161616' }
+};
+let currentSettings = JSON.parse(JSON.stringify(defaultSettings));
+
+function hexToRgba(hex, alpha) {
+    let r = 0, g = 0, b = 0;
+    if (hex.length == 4) {
+        r = "0x" + hex[1] + hex[1];
+        g = "0x" + hex[2] + hex[2];
+        b = "0x" + hex[3] + hex[3];
+    } else if (hex.length == 7) {
+        r = "0x" + hex[1] + hex[2];
+        g = "0x" + hex[3] + hex[4];
+        b = "0x" + hex[5] + hex[6];
+    }
+    return `rgba(${+r},${+g},${+b},${alpha})`;
+}
+
+function applySettings() {
+    document.getElementById('grad-up-1').style.stopColor = currentSettings.colors.up;
+    document.getElementById('grad-up-2').style.stopColor = currentSettings.colors.up;
+    document.getElementById('grad-down-1').style.stopColor = currentSettings.colors.down;
+    document.getElementById('grad-down-2').style.stopColor = currentSettings.colors.down;
+    document.getElementById('grad-left-1').style.stopColor = currentSettings.colors.left;
+    document.getElementById('grad-left-2').style.stopColor = currentSettings.colors.left;
+    document.getElementById('grad-right-1').style.stopColor = currentSettings.colors.right;
+    document.getElementById('grad-right-2').style.stopColor = currentSettings.colors.right;
+
+    const gridBgRgba = hexToRgba(currentSettings.colors.grid, 0.6);
+    document.querySelectorAll('.game-grid').forEach(grid => {
+        grid.style.backgroundColor = gridBgRgba;
+    });
+
+    DOMElements.playerNameInput.value = currentSettings.playerName;
+}
+
+function updateSettingsUI() {
+    DOMElements.playerNameInput.value = currentSettings.playerName;
+    
+    DOMElements.bindUpBtn.textContent = currentSettings.keyBinds.ArrowUp;
+    DOMElements.bindDownBtn.textContent = currentSettings.keyBinds.ArrowDown;
+    DOMElements.bindLeftBtn.textContent = currentSettings.keyBinds.ArrowLeft;
+    DOMElements.bindRightBtn.textContent = currentSettings.keyBinds.ArrowRight;
+    
+    DOMElements.colorUpInput.value = currentSettings.colors.up;
+    DOMElements.colorDownInput.value = currentSettings.colors.down;
+    DOMElements.colorLeftInput.value = currentSettings.colors.left;
+    DOMElements.colorRightInput.value = currentSettings.colors.right;
+    DOMElements.colorGridInput.value = currentSettings.colors.grid;
+}
+
+function saveSettings() {
+    currentSettings.playerName = DOMElements.playerNameInput.value;
+    currentSettings.colors.up = DOMElements.colorUpInput.value;
+    currentSettings.colors.down = DOMElements.colorDownInput.value;
+    currentSettings.colors.left = DOMElements.colorLeftInput.value;
+    currentSettings.colors.right = DOMElements.colorRightInput.value;
+    currentSettings.colors.grid = DOMElements.colorGridInput.value;
+
+    localStorage.setItem('sonostraSettings', JSON.stringify(currentSettings));
+
+    const saveBtn = DOMElements.saveSettingsBtn;
+    saveBtn.textContent = 'Saved!';
+    setTimeout(() => { saveBtn.textContent = 'Save'; }, 1500);
+}
+
+function loadSettings() {
+    const saved = localStorage.getItem('sonostraSettings');
+    if (saved) {
+        const savedSettings = JSON.parse(saved);
+        Object.assign(currentSettings.keyBinds, savedSettings.keyBinds);
+        Object.assign(currentSettings.colors, savedSettings.colors);
+        currentSettings.playerName = savedSettings.playerName || '';
+    }
+    applySettings();
+    updateSettingsUI();
+}
+
+function listenForKeybind(action, btnElement) {
+    const listeningBtns = document.querySelectorAll('.listening');
+    if (listeningBtns.length > 0) return;
+
+    btnElement.textContent = 'Press any key...';
+    btnElement.classList.add('listening');
+
+    const handleKeyDown = (e) => {
+        e.preventDefault();
+        const newKey = e.key;
+
+        const isKeyBound = Object.values(currentSettings.keyBinds).includes(newKey);
+        if (isKeyBound && currentSettings.keyBinds[action] !== newKey) {
+            alert(`Key "${newKey}" is already bound to another action.`);
+            btnElement.textContent = currentSettings.keyBinds[action];
+        } else {
+            currentSettings.keyBinds[action] = newKey;
+            btnElement.textContent = newKey;
+        }
+
+        btnElement.classList.remove('listening');
+        window.removeEventListener('keydown', handleKeyDown);
+    };
+
+    window.addEventListener('keydown', handleKeyDown, { once: true });
+}
+
 // --- Game Data ---
-const BOSS_NAMES = ["Sonus", "Tremor", "Siren", "Symphony", "Echo", "Sonoris", "Noctaria", "Legion", "Echolyra", "Stellaria", "Orbisona"];
+const BOSS_NAMES = ["Sonus", "Tremor", "Siren", "Symphony", "Echo"]; // Echoes
+const MENACING_BOSS_NAMES = ["Sonoris", "Noctaria", "Legion", "Echolyra", "Stellaria", "Orbisona"]; // Crescendos
 const BOSS_ELEMENTS = ["fire", "poison", "ice"];
 const BOSS_ACTIONS = ["timer_burn", "blur", "stealth", "heal", "seismic_shift", "rhythm_shift"];
 const ATTACK_NAMES = {
@@ -57,6 +213,7 @@ const ARROW_SVG = {
 };
 const LIFE_SVG = `<svg class="life-heart" viewBox="0 0 24 24" fill="currentColor"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"></path></svg>`;
 const ARROW_KEYS = ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'];
+const COMBO_COLORS = ['#03A9F4', '#FF00FF', '#FFFF00', '#00E676', '#7C4DFF'];
 
 // --- Game State & Management ---
 let peer, conn;
@@ -68,6 +225,10 @@ const gameState = {
     isHost: false,
     mode: 'solo',
     bossMode: false,
+    isTransitioning: false,
+    pendingNextWave: false,
+    currentWave: 1,
+    isCrescendoWave: false,
     bossIsEnraged: false,
     sequenceTurnCounter: 0,
     bossName: '',
@@ -83,6 +244,8 @@ class Player {
         this.id = id;
         this.name = name;
         this.isLocal = isLocal;
+        this.isIdle = true;
+        this.level = 0;
         this.lives = 3;
         this.combo = 0;
         this.sequenceProgress = 0;
@@ -94,11 +257,14 @@ class Player {
         this.decayActive = false;
         this.highestCombo = 0;
         this.damageDealt = 0;
+        this.speedBoostActive = false;
 
         this.dom = {
             playerArea: document.getElementById(`player${id}-container`),
             attackAnnouncement: document.getElementById(`attack-announcement-p${id}`),
+            levelupText: document.getElementById(`levelup-p${id}`),
             name: document.getElementById(`name-p${id}`),
+            level: document.getElementById(`level-p${id}`),
             lives: document.getElementById(`lives-p${id}`),
             grid: document.getElementById(`grid-p${id}`),
             sequenceContainer: document.getElementById(`sequence-p${id}`),
@@ -112,6 +278,7 @@ class Player {
         this.updateName(name);
         this.updateLives(3);
         this.updateCombo(0);
+        this.updateLevel(0);
     }
 
     updateName(name) { this.name = name; this.dom.name.textContent = name; }
@@ -129,6 +296,7 @@ class Player {
         this.combo = combo;
         this.highestCombo = Math.max(this.highestCombo, this.combo);
         this.dom.comboCount.textContent = this.combo;
+
         if (this.combo > 0) {
             this.dom.comboContainer.classList.add('visible');
             this.dom.comboCount.classList.add('pop');
@@ -136,9 +304,39 @@ class Player {
         } else {
             this.dom.comboContainer.classList.remove('visible');
         }
+
+        if (this.combo >= 50) {
+            this.dom.grid.classList.add('combo-fever');
+            if (this.combo % 10 === 0) {
+                const colorIndex = (this.combo / 10) % COMBO_COLORS.length;
+                this.dom.grid.style.setProperty('--glow-color', COMBO_COLORS[colorIndex]);
+            }
+            const vibrancyLevel = Math.floor(this.combo / 100);
+            const glowSize = 25 + (vibrancyLevel * 10);
+            this.dom.grid.style.setProperty('--glow-size', `${glowSize}px`);
+        } else {
+            this.dom.grid.classList.remove('combo-fever');
+        }
+
+        this.speedBoostActive = this.combo >= 100;
+    }
+
+    updateLevel(newLevel) {
+        this.level = newLevel;
+        if (this.level > 0) {
+            this.dom.level.textContent = `Lvl ${this.level}`;
+            this.dom.level.style.display = 'block';
+        } else {
+            this.dom.level.style.display = 'none';
+        }
     }
 
     startNewSequence(sequence = null) {
+        this.isIdle = false;
+        if(this.isLocal && gameState.mode === 'multi' && conn) {
+            sendData({ type: 'player_state_update', isIdle: this.isIdle });
+        }
+
         this.dom.sequenceContainer.classList.remove('stealth');
         
         const timerBarContainer = this.dom.timerBar.parentElement;
@@ -147,22 +345,29 @@ class Player {
             timerBarContainer.classList.add('decay-active');
             this.decayActive = false;
         } else {
-            this.timeLimit = Math.max(4000, 10000 - (this.successfulSequences * 400));
-            timerBarContainer.classList.remove('decay-active');
+            const baseTime = 10000;
+            const timeReduction = gameState.currentWave * 150;
+            this.timeLimit = Math.max(3500, baseTime - timeReduction);
+        }
+        
+        if (this.speedBoostActive) {
+            this.timeLimit *= 0.8;
         }
         
         cancelAnimationFrame(this.timerId);
         this.sequenceProgress = 0;
 
         if (!sequence) {
-            if (this.combo > 0 && this.combo % 9 === 0) {
-                this.sequenceLength = 12;
-            } else if (this.successfulSequences >= 8) {
-                this.sequenceLength = Math.floor(Math.random() * 5) + 4;
-            } else if (this.successfulSequences >= 3) {
-                this.sequenceLength = Math.min(8, this.successfulSequences + 1);
+            if (gameState.isCrescendoWave) {
+                this.sequenceLength = Math.floor(Math.random() * 4) + 9;
             } else {
-                this.sequenceLength = 3;
+                const baseLength = 3;
+                const lengthIncrease = Math.floor(gameState.currentWave / 2);
+                this.sequenceLength = Math.min(12, baseLength + lengthIncrease);
+
+                if (this.combo > 0 && this.combo % 9 === 0) {
+                    this.sequenceLength = 12;
+                }
             }
             this.currentSequence = Array.from({ length: this.sequenceLength }, () => ARROW_KEYS[Math.floor(Math.random() * 4)]);
         } else {
@@ -171,38 +376,34 @@ class Player {
 
         this.displaySequence();
         this.startTimer();
+
+        if (this.isLocal && gameState.mode === 'multi' && conn) {
+            sendData({ type: 'new_sequence', sequence: this.currentSequence, combo: this.combo });
+        }
     }
 
     displaySequence() {
         const sequenceLength = this.currentSequence.length;
-        let arrowSize = 64;
-        let arrowGap = 16;
-
-        if (window.innerWidth <= 768) {
-             if (sequenceLength >= 11) {
-                arrowSize = 42;
-                arrowGap = 5;
-            } else if (sequenceLength >= 9) {
-                arrowSize = 48;
-                arrowGap = 6;
-            } else if (sequenceLength >= 7) {
-                arrowSize = 54;
-                arrowGap = 8;
-            } else {
-                arrowSize = 60;
-                arrowGap = 10;
-            }
-        } else if (sequenceLength > 10) {
-            arrowSize = 50;
-            arrowGap = 8;
-        }
+        const grid = this.dom.grid;
+        const container = this.dom.sequenceContainer;
+    
+        const availableWidth = grid.offsetWidth - 40; 
         
-        this.dom.sequenceContainer.style.setProperty('--arrow-size', `${arrowSize}px`);
-        this.dom.sequenceContainer.style.setProperty('--arrow-gap', `${arrowGap}px`);
-
-        this.dom.sequenceContainer.innerHTML = '';
+        const maxArrowSize = 80;
+        const minArrowSize = 35;
+    
+        let idealSize = (availableWidth / sequenceLength) - 10; 
+    
+        let finalArrowSize = Math.max(minArrowSize, Math.min(idealSize, maxArrowSize));
+    
+        let finalArrowGap = finalArrowSize * 0.15;
+    
+        container.style.setProperty('--arrow-size', `${finalArrowSize}px`);
+        container.style.setProperty('--arrow-gap', `${finalArrowGap}px`);
+    
+        container.innerHTML = '';
         this.currentSequence.forEach(arrowKey => {
-            this.dom.sequenceContainer.innerHTML += ARROW_SVG[arrowKey];
+            container.innerHTML += ARROW_SVG[arrowKey];
         });
     }
 
@@ -225,6 +426,7 @@ class Player {
 
 // --- Main Functions ---
 function init() {
+    loadSettings();
     setupTitleScreenListeners();
     setupUIListeners();
 
@@ -281,89 +483,143 @@ function setupUIListeners() {
             DOMElements.videoUrlInput.value = newUrl;
             setVideoBackground();
             DOMElements.nextVideoInput.value = '';
+            if (gameState.mode === 'multi' && conn) {
+                sendData({ type: 'video_change', url: newUrl });
+            }
         }
     });
+
+    // Settings screen listeners
+    DOMElements.settingsBtn.addEventListener('click', () => {
+        updateSettingsUI();
+        DOMElements.settingsScreen.classList.remove('hidden');
+    });
+    DOMElements.closeSettingsBtn.addEventListener('click', () => {
+        loadSettings();
+        DOMElements.settingsScreen.classList.add('hidden');
+    });
+    DOMElements.saveSettingsBtn.addEventListener('click', saveSettings);
+    DOMElements.defaultsSettingsBtn.addEventListener('click', () => {
+        if (confirm('Are you sure you want to load default settings? Any unsaved changes will be lost.')) {
+            currentSettings = JSON.parse(JSON.stringify(defaultSettings));
+            applySettings();
+            updateSettingsUI();
+        }
+    });
+
+    DOMElements.bindUpBtn.addEventListener('click', () => listenForKeybind('ArrowUp', DOMElements.bindUpBtn));
+    DOMElements.bindDownBtn.addEventListener('click', () => listenForKeybind('ArrowDown', DOMElements.bindDownBtn));
+    DOMElements.bindLeftBtn.addEventListener('click', () => listenForKeybind('ArrowLeft', DOMElements.bindLeftBtn));
+    DOMElements.bindRightBtn.addEventListener('click', () => listenForKeybind('ArrowRight', DOMElements.bindRightBtn));
+
+    DOMElements.colorUpInput.addEventListener('input', () => { currentSettings.colors.up = DOMElements.colorUpInput.value; applySettings(); });
+    DOMElements.colorDownInput.addEventListener('input', () => { currentSettings.colors.down = DOMElements.colorDownInput.value; applySettings(); });
+    DOMElements.colorLeftInput.addEventListener('input', () => { currentSettings.colors.left = DOMElements.colorLeftInput.value; applySettings(); });
+    DOMElements.colorRightInput.addEventListener('input', () => { currentSettings.colors.right = DOMElements.colorRightInput.value; applySettings(); });
+    DOMElements.colorGridInput.addEventListener('input', () => { currentSettings.colors.grid = DOMElements.colorGridInput.value; applySettings(); });
+
+
     document.addEventListener('fullscreenchange', updateFullscreenIcons);
     window.addEventListener('keydown', handleKeyPress);
     handleGameModeChange();
 }
 
 function handleGameModeChange() {
-    const isVersus = DOMElements.gameModeToggle.checked;
-    if (isVersus) {
+    const isMultiplayer = DOMElements.gameModeToggle.checked;
+    if (isMultiplayer) {
         gameState.mode = 'multi';
         DOMElements.joinBtn.style.display = 'block';
         DOMElements.roomNameInput.style.display = 'block';
         DOMElements.startBtn.textContent = 'Create Game';
+        DOMElements.bossModeContainer.style.display = 'flex';
     } else {
         gameState.mode = 'solo';
         DOMElements.joinBtn.style.display = 'none';
         DOMElements.roomNameInput.style.display = 'none';
         DOMElements.startBtn.textContent = 'Start Game';
+        DOMElements.bossModeContainer.style.display = 'flex';
     }
 }
 
 function onStartGameClick() {
-    setVideoBackground();
     gameState.isHost = true;
     gameState.bossMode = DOMElements.bossModeToggle.checked;
     const playerName = DOMElements.playerNameInput.value || 'Player 1';
     
     if (gameState.mode === 'solo') {
         localPlayer = new Player(1, playerName, true);
+        const playerData = loadPlayerData();
+        localPlayer.updateLevel(playerData.highestWave);
         localPlayer.dom.playerArea.classList.add('is-local-player');
         localPlayer.dom.grid.addEventListener('touchstart', handleTouchStart, false);
         localPlayer.dom.grid.addEventListener('touchmove', handleTouchMove, false);
         localPlayer.dom.grid.addEventListener('touchend', handleTouchEnd, false);
         
         DOMElements.player2Container.style.display = 'none';
-        if (gameState.bossMode) initBoss();
         
         transitionToGameArea();
-        setTimeout(() => localPlayer.startNewSequence(), 1000);
+        setVideoBackground();
+        
+        if (gameState.bossMode) {
+            startWave(1);
+        } else {
+            localPlayer.startNewSequence();
+        }
+
     } else { // Multiplayer
         const roomName = DOMElements.roomNameInput.value;
         if (!roomName) return alert('Please enter a room name.');
         
         localPlayer = new Player(1, playerName, true);
+        const playerData = loadPlayerData();
+        localPlayer.updateLevel(playerData.highestWave);
         localPlayer.dom.playerArea.classList.add('is-local-player');
         localPlayer.dom.grid.addEventListener('touchstart', handleTouchStart, false);
         localPlayer.dom.grid.addEventListener('touchmove', handleTouchMove, false);
         localPlayer.dom.grid.addEventListener('touchend', handleTouchEnd, false);
-
-        if (gameState.bossMode) initBoss();
         
         peer = new Peer(roomName);
-        peer.on('open', id => console.log('PeerJS room created: ' + id));
+        peer.on('open', id => {
+            transitionToGameArea();
+            DOMElements.lobbyOverlay.classList.remove('hidden');
+            DOMElements.lobbyText.textContent = `Waiting for opponent...\nRoom: ${id}`;
+        });
         peer.on('connection', newConn => { conn = newConn; setupConnection(); });
         peer.on('error', err => alert('PeerJS Error: ' + err.type));
     }
 }
 
 function onJoinGameClick() {
-    setVideoBackground();
     gameState.isHost = false;
     const playerName = DOMElements.playerNameInput.value || 'Player 2';
     const roomName = DOMElements.roomNameInput.value;
     if (!roomName) return alert('Please enter a room name to join.');
 
     localPlayer = new Player(2, playerName, true);
+    const playerData = loadPlayerData();
+    localPlayer.updateLevel(playerData.highestWave);
     localPlayer.dom.playerArea.classList.add('is-local-player');
     localPlayer.dom.grid.addEventListener('touchstart', handleTouchStart, false);
     localPlayer.dom.grid.addEventListener('touchmove', handleTouchMove, false);
     localPlayer.dom.grid.addEventListener('touchend', handleTouchEnd, false);
 
     peer = new Peer();
-    peer.on('open', () => { conn = peer.connect(roomName); setupConnection(); });
+    peer.on('open', () => {
+        conn = peer.connect(roomName); 
+        setupConnection();
+        transitionToGameArea();
+        DOMElements.lobbyOverlay.classList.remove('hidden');
+        DOMElements.lobbyText.textContent = 'Connecting...';
+    });
     peer.on('error', err => alert('PeerJS Error: ' + err.type));
 }
 
 function setupConnection() {
     conn.on('open', () => {
         if (!gameState.isHost) {
-            sendData({ type: 'player_join', name: localPlayer.name });
+            DOMElements.lobbyText.textContent = 'Connected! Waiting for host...';
+            sendData({ type: 'player_join', name: localPlayer.name, level: localPlayer.level });
         }
-        transitionToGameArea();
     });
 
     conn.on('data', data => {
@@ -371,72 +627,47 @@ function setupConnection() {
             case 'player_join':
                 if (gameState.isHost) {
                     remotePlayer = new Player(2, data.name, false);
+                    remotePlayer.updateLevel(data.level);
                     remotePlayer.dom.playerArea.classList.add('is-remote-player');
                     sendData({
                         type: 'initial_state',
                         hostName: localPlayer.name,
+                        level: localPlayer.level,
                         videoUrl: gameState.videoUrl,
-                        bossState: gameState.bossMode ? {
-                            name: gameState.bossName,
-                            level: gameState.bossLevel,
-                            element: gameState.bossElement,
-                            maxHealth: gameState.bossMaxHealth,
-                            currentHealth: gameState.bossCurrentHealth,
-                        } : null
+                        bossMode: gameState.bossMode,
                     });
-                    setTimeout(() => {
-                        localPlayer.startNewSequence();
-                        sendData({ type: 'new_sequence', sequence: localPlayer.currentSequence, combo: localPlayer.combo });
-                        
-                        const guestSequence = Array.from({ length: 3 }, () => ARROW_KEYS[Math.floor(Math.random() * 4)]);
-                        remotePlayer.startNewSequence(guestSequence);
-                        sendData({ type: 'start_game', sequence: guestSequence });
-                    }, 500);
+                    
+                    startCountdown();
+                    sendData({ type: 'start_countdown' });
                 }
                 break;
-            case 'initial_state':
-                if(data.bossState) {
-                    gameState.bossMode = true;
-                    initBoss(data.bossState);
-                }
-                remotePlayer = new Player(1, data.hostName, false);
-                remotePlayer.dom.playerArea.classList.add('is-remote-player');
-                gameState.videoUrl = data.videoUrl;
+            case 'start_countdown':
+                if (!gameState.isHost) startCountdown();
+                break;
+            case 'video_change':
+                gameState.videoUrl = data.url;
+                DOMElements.videoUrlInput.value = data.url;
+                DOMElements.nextVideoInput.value = data.url;
                 setVideoBackground();
                 break;
-            case 'start_game':
-                if (localPlayer && !gameState.isHost) {
-                    localPlayer.startNewSequence(data.sequence);
-                }
+            case 'initial_state':
+                remotePlayer = new Player(1, data.hostName, false);
+                remotePlayer.updateLevel(data.level);
+                remotePlayer.dom.playerArea.classList.add('is-remote-player');
+                gameState.videoUrl = data.videoUrl;
+                gameState.bossMode = data.bossMode;
                 break;
             case 'new_sequence':
                 if (remotePlayer) {
                     remotePlayer.startNewSequence(data.sequence);
                     remotePlayer.updateCombo(data.combo);
                 }
-                hostCheckBossTrigger(); // Host counts guest's turns
                 break;
             case 'key_press_update':
                 if (remotePlayer) handleRemoteKeyPress(data.progress);
                 break;
             case 'failure_update':
                  if (remotePlayer) remotePlayer.updateLives(data.lives);
-                break;
-            case 'boss_health_update':
-                updateBossHealth(data.newHealth, data.isHeavy);
-                break;
-            case 'boss_action':
-                if (data.action === 'heal') {
-                    DOMElements.bossArea.classList.add('boss-healing');
-                    setTimeout(() => DOMElements.bossArea.classList.remove('boss-healing'), 1000);
-                } else {
-                    const target = data.targetId === localPlayer.id ? localPlayer : remotePlayer;
-                    if(target) {
-                       DOMElements.bossArea.classList.add('boss-acting');
-                       setTimeout(() => DOMElements.bossArea.classList.remove('boss-acting'), 1000);
-                       applyBossAttack(data.action, target);
-                    }
-                }
                 break;
             case 'game_over':
                 gameOver(data.winnerName);
@@ -447,50 +678,176 @@ function setupConnection() {
             case 'chat':
                 addChatMessage(data.message, 'theirs');
                 break;
+            case 'damage_boss':
+                if (gameState.isHost && remotePlayer) {
+                    const damage = data.damageType === 'heavy' ? 25 : 5;
+                    dealDamageToBoss(damage, remotePlayer, data.damageType === 'heavy');
+                }
+                break;
+            case 'boss_health_update':
+                if (!gameState.isHost) {
+                    updateBossHealth(data.health);
+                }
+                break;
+            case 'wave_change':
+                if (!gameState.isHost) {
+                    startWave(data.wave);
+                }
+                break;
+            case 'level_update':
+                if (remotePlayer) {
+                    remotePlayer.updateLevel(data.level);
+                }
+                break;
+            case 'boss_attack':
+                if (!gameState.isHost) {
+                    applyBossAttack(data.attackType, localPlayer);
+                }
+                break;
+            case 'player_state_update':
+                if (remotePlayer) {
+                    remotePlayer.isIdle = data.isIdle;
+                    if (gameState.isHost && remotePlayer.isIdle && gameState.pendingNextWave) {
+                        gameState.pendingNextWave = false;
+                        startWave(gameState.currentWave + 1);
+                    }
+                }
+                break;
         }
     });
 }
 
-// --- Boss Functions ---
-function initBoss(bossState = null) {
-    DOMElements.bossArea.style.display = 'block';
-    DOMElements.bossArea.classList.remove('enraged');
-    gameState.bossIsEnraged = false;
+// --- Announcement and Wave Logic ---
+function showAnnouncement(element, text, duration) {
+    element.textContent = text;
+    element.classList.remove('hidden');
+    return new Promise(resolve => {
+        setTimeout(() => {
+            element.classList.add('hidden');
+            setTimeout(resolve, 300);
+        }, duration);
+    });
+}
 
-    if (bossState) {
-        gameState.bossName = bossState.name;
-        gameState.bossLevel = bossState.level;
-        gameState.bossElement = bossState.element;
-        gameState.bossMaxHealth = bossState.maxHealth;
-        gameState.bossCurrentHealth = bossState.currentHealth;
-    } else {
-        gameState.bossName = BOSS_NAMES[Math.floor(Math.random() * BOSS_NAMES.length)];
-        gameState.bossLevel = Math.floor(Math.random() * 10) + 1;
-        gameState.bossElement = BOSS_ELEMENTS[Math.floor(Math.random() * BOSS_ELEMENTS.length)];
-        gameState.bossCurrentHealth = gameState.bossMaxHealth;
+async function startWave(waveNumber) {
+    const completedWave = waveNumber - 1;
+    if (completedWave > 0 && localPlayer.isLocal) {
+        const playerData = loadPlayerData();
+        if (completedWave > playerData.highestWave) {
+            playerData.highestWave = completedWave;
+            savePlayerData(playerData);
+            localPlayer.updateLevel(playerData.highestWave);
+            triggerLevelUpEffect();
+            if (gameState.mode === 'multi' && conn) {
+                sendData({ type: 'level_update', level: localPlayer.level });
+            }
+        }
     }
+
+    gameState.currentWave = waveNumber;
+    gameState.isCrescendoWave = gameState.currentWave % 3 === 0;
+    DOMElements.bossArea.classList.remove('crescendo-intro');
+
+    if (gameState.isCrescendoWave) {
+        await showAnnouncement(DOMElements.warningEncounter, 'WARNING!!!', 2500);
+        initBoss(true);
+    } else {
+        if (waveNumber > 1) {
+             await showAnnouncement(DOMElements.waveAnnouncement, `WAVE ${gameState.currentWave}`, 2000);
+        }
+        initBoss(false);
+    }
+    
+    localPlayer.startNewSequence();
+
+    if (gameState.isHost && gameState.mode === 'multi' && conn) {
+        sendData({ type: 'wave_change', wave: waveNumber });
+    }
+    
+    gameState.isTransitioning = false;
+}
+
+function rewardPlayer() {
+    if (localPlayer.lives < 3) {
+        localPlayer.lives++;
+        localPlayer.updateLives(localPlayer.lives);
+        return true;
+    }
+    return false;
+}
+
+function startCountdown() {
+    DOMElements.lobbyOverlay.classList.remove('hidden');
+    let count = 3;
+    const updateText = (text) => {
+        DOMElements.lobbyText.textContent = text;
+        DOMElements.lobbyText.classList.remove('countdown-pop');
+        void DOMElements.lobbyText.offsetWidth;
+        DOMElements.lobbyText.classList.add('countdown-pop');
+    };
+
+    updateText(count);
+    const interval = setInterval(() => {
+        count--;
+        if (count > 0) {
+            updateText(count);
+        } else {
+            clearInterval(interval);
+            updateText('START!');
+            setTimeout(() => {
+                DOMElements.lobbyOverlay.classList.add('hidden');
+                setVideoBackground();
+                
+                if (gameState.bossMode) {
+                    if (gameState.isHost) {
+                        startWave(1);
+                    }
+                } else {
+                    localPlayer.startNewSequence();
+                }
+            }, 1000);
+        }
+    }, 1000);
+}
+
+// --- Boss Functions ---
+function initBoss(isCrescendo) {
+    DOMElements.bossArea.style.display = 'block';
+    DOMElements.bossArea.classList.remove('enraged', 'boss-active', 'crescendo-intro');
+    gameState.bossIsEnraged = false;
+    gameState.sequenceTurnCounter = 0;
+
+    if (isCrescendo) {
+        DOMElements.bossSymbol.textContent = '💀';
+        DOMElements.bossSymbol.classList.remove('hidden');
+        DOMElements.bossArea.classList.add('boss-active', 'crescendo-intro');
+    } else {
+        DOMElements.bossSymbol.classList.add('hidden');
+    }
+
+    const bossLevel = gameState.currentWave;
+    const bossNameList = isCrescendo ? MENACING_BOSS_NAMES : BOSS_NAMES;
+    
+    gameState.bossName = bossNameList[Math.floor(Math.random() * bossNameList.length)];
+    gameState.bossLevel = bossLevel;
+    gameState.bossElement = BOSS_ELEMENTS[Math.floor(Math.random() * BOSS_ELEMENTS.length)];
+    
+    const baseHealth = isCrescendo ? 300 : 150;
+    gameState.bossMaxHealth = baseHealth + (bossLevel * 25);
+    gameState.bossCurrentHealth = gameState.bossMaxHealth;
+    
     DOMElements.bossName.textContent = gameState.bossName;
     DOMElements.bossLevel.textContent = `Lvl ${gameState.bossLevel}`;
-    DOMElements.bossArea.className = '';
     DOMElements.bossArea.classList.add(gameState.bossElement);
+
     updateBossHealth(gameState.bossCurrentHealth);
 }
 
 function hostCheckBossTrigger() {
-    if (!gameState.isHost || !gameState.bossMode || gameState.status !== 'playing') return;
+    if (gameState.status !== 'playing' || !gameState.bossMode || gameState.isTransitioning) return;
+    
     gameState.sequenceTurnCounter++;
-    
-    if (localPlayer.combo >= 6 && localPlayer.combo < 9 && Math.random() < 0.3) {
-        applyBossAttack('rhythm_shift', localPlayer);
-        return;
-    }
-    if (remotePlayer && remotePlayer.combo >= 6 && remotePlayer.combo < 9 && Math.random() < 0.3) {
-        applyBossAttack('rhythm_shift', remotePlayer);
-        return;
-    }
-    
     const triggerInterval = gameState.bossIsEnraged ? 2 : 3;
-
     if(gameState.sequenceTurnCounter > 0 && gameState.sequenceTurnCounter % triggerInterval === 0) {
         triggerBossAction();
     }
@@ -504,26 +861,30 @@ function triggerBossAction() {
         setTimeout(() => DOMElements.bossArea.classList.remove('boss-healing'), 1000);
         const newHealth = Math.min(gameState.bossMaxHealth, gameState.bossCurrentHealth + 10);
         updateBossHealth(newHealth);
-        sendData({ type: 'boss_action', action: 'heal' });
-        sendData({ type: 'boss_health_update', newHealth: newHealth });
     } else {
-        const target = gameState.mode === 'multi' ? (Math.random() < 0.5 ? localPlayer : remotePlayer) : localPlayer;
-        if (!target) return;
+        let target = localPlayer;
+        if (remotePlayer && Math.random() < 0.5) {
+            target = remotePlayer;
+        }
+
         DOMElements.bossArea.classList.add('boss-acting');
         setTimeout(() => DOMElements.bossArea.classList.remove('boss-acting'), 1000);
-        applyBossAttack(action, target);
-        if(gameState.mode === 'multi') sendData({ type: 'boss_action', action: action, targetId: target.id });
+        
+        if (target.isLocal) {
+            applyBossAttack(action, target);
+        } else {
+            sendData({ type: 'boss_attack', attackType: action });
+        }
     }
 }
 
 function showAttackAnnouncement(attackType, player, isDramatic = false) {
+    if (!player || !player.dom || !player.dom.attackAnnouncement) return;
     const attackName = ATTACK_NAMES[attackType];
-    if (!attackName || !player) return;
+    if (!attackName) return;
     const container = player.dom.attackAnnouncement;
 
-    if (isDramatic) {
-        container.classList.add('dramatic');
-    }
+    if (isDramatic) { container.classList.add('dramatic'); }
 
     container.innerHTML = '';
     attackName.split('').forEach((char, index) => {
@@ -536,9 +897,7 @@ function showAttackAnnouncement(attackType, player, isDramatic = false) {
     container.classList.add('visible');
     setTimeout(() => {
         container.classList.remove('visible');
-        if (isDramatic) {
-            container.classList.remove('dramatic');
-        }
+        if (isDramatic) { container.classList.remove('dramatic'); }
     }, 2500);
 }
 
@@ -581,8 +940,21 @@ function applyBossAttack(attackType, player) {
     }
 }
 
-function dealDamageToBoss(damage, player, isHeavyAttack = false) {
-    if (gameState.status !== 'playing') return;
+function playDeathAnimation(isCrescendo) {
+    return new Promise(resolve => {
+        const duration = isCrescendo ? 1500 : 1000;
+        const container = DOMElements.bossHealthBarContainer;
+        container.classList.add(isCrescendo ? 'crescendo-defeated' : 'defeated');
+        
+        setTimeout(() => {
+            container.classList.remove('crescendo-defeated', 'defeated');
+            resolve();
+        }, duration);
+    });
+}
+
+async function dealDamageToBoss(damage, player, isHeavyAttack = false) {
+    if (gameState.status !== 'playing' || gameState.isTransitioning) return;
 
     player.damageDealt += damage;
     player.dom.grid.classList.add('attack-launch');
@@ -591,11 +963,23 @@ function dealDamageToBoss(damage, player, isHeavyAttack = false) {
     const newHealth = Math.max(0, gameState.bossCurrentHealth - damage);
     updateBossHealth(newHealth, isHeavyAttack);
 
-    if (gameState.mode === 'multi') sendData({ type: 'boss_health_update', newHealth: newHealth, isHeavy: isHeavyAttack });
-
     if (newHealth <= 0) {
-        const winner = gameState.mode === 'multi' ? `${localPlayer.name} & ${remotePlayer.name}` : localPlayer.name;
-        gameOver(`${winner} Victorious!`);
+        gameState.isTransitioning = true; 
+        await playDeathAnimation(gameState.isCrescendoWave);
+        
+        if (remotePlayer && !remotePlayer.isIdle) {
+            gameState.pendingNextWave = true;
+            return;
+        }
+
+        if (gameState.isCrescendoWave) {
+            if (rewardPlayer()) {
+                await showAnnouncement(DOMElements.rewardAnnouncement, '+1 LIFE', 1500);
+            }
+        }
+        startWave(gameState.currentWave + 1);
+    } else if (player.isLocal) {
+        player.startNewSequence();
     }
 }
 
@@ -611,19 +995,20 @@ function updateBossHealth(health, isHeavy = false) {
 
     if (isHeavy) {
         DOMElements.bossHealthBarContainer.classList.add('heavy-shake');
-        
         const crack = document.createElement('div');
         crack.className = 'health-crack-effect';
         DOMElements.bossHealthBarContainer.appendChild(crack);
-
         setTimeout(() => {
             DOMElements.bossHealthBarContainer.classList.remove('heavy-shake');
             crack.remove();
         }, 500);
-
     } else {
         DOMElements.bossHealthBarContainer.classList.add('jiggle');
         setTimeout(() => DOMElements.bossHealthBarContainer.classList.remove('jiggle'), 300);
+    }
+
+    if (gameState.isHost && gameState.mode === 'multi' && conn) {
+        sendData({ type: 'boss_health_update', health: gameState.bossCurrentHealth });
     }
 }
 
@@ -639,8 +1024,11 @@ function transitionToGameArea() {
 
 function handleKeyPress(e) {
     if (gameState.status === 'gameover' || titleScreenActive) return;
-    const key = e.key || e;
-    if (!ARROW_KEYS.includes(key)) return;
+
+    const pressedKey = e.key;
+    const action = Object.keys(currentSettings.keyBinds).find(act => currentSettings.keyBinds[act] === pressedKey);
+
+    if (!action) return;
     
     if (gameState.status === 'setup') gameState.status = 'playing';
 
@@ -648,7 +1036,7 @@ function handleKeyPress(e) {
     const player = localPlayer;
     if (!player || !player.currentSequence || player.currentSequence.length === 0) return;
 
-    if (key === player.currentSequence[player.sequenceProgress]) {
+    if (action === player.currentSequence[player.sequenceProgress]) {
         handleCorrectKeyPress(player);
     } else {
         handleFailure(player);
@@ -667,26 +1055,32 @@ function handleCorrectKeyPress(player) {
     if (player.sequenceProgress === player.currentSequence.length) {
         player.successfulSequences++;
         player.updateCombo(player.combo + 1);
-
         player.dom.grid.classList.add('success-glow');
         setTimeout(() => player.dom.grid.classList.remove('success-glow'), 500);
-
-        if (gameState.bossMode) {
-            if (player.combo > 0 && player.combo % 10 === 0) {
-                dealDamageToBoss(25, player, true);
-            } else {
-                dealDamageToBoss(5, player, false);
-            }
+        
+        player.isIdle = true;
+        if(player.isLocal && gameState.mode === 'multi' && conn) {
+            sendData({ type: 'player_state_update', isIdle: player.isIdle });
         }
 
-        setTimeout(() => {
-            player.startNewSequence();
-            if (gameState.mode === 'multi') {
-                sendData({ type: 'new_sequence', sequence: player.currentSequence, combo: player.combo });
+        if (gameState.bossMode) {
+            cancelAnimationFrame(player.timerId);
+            const damageType = (player.combo > 0 && player.combo % 10 === 0) ? 'heavy' : 'regular';
+            if (gameState.isHost) {
+                dealDamageToBoss(damageType === 'heavy' ? 25 : 5, player, damageType === 'heavy');
             } else {
-                hostCheckBossTrigger();
+                sendData({ type: 'damage_boss', damageType: damageType });
+                if (!gameState.pendingNextWave) {
+                    player.startNewSequence();
+                }
             }
-        }, 300);
+        } else {
+            setTimeout(() => player.startNewSequence(), 300);
+        }
+        
+        if (gameState.isHost) {
+            hostCheckBossTrigger();
+        }
     }
 }
 
@@ -694,6 +1088,11 @@ function handleFailure(player) {
     player.lives--;
     player.updateLives(player.lives);
     player.updateCombo(0);
+    
+    player.isIdle = true;
+    if(player.isLocal && gameState.mode === 'multi' && conn) {
+        sendData({ type: 'player_state_update', isIdle: player.isIdle });
+    }
 
     player.dom.grid.classList.add('fail-flash');
     setTimeout(() => player.dom.grid.classList.remove('fail-flash'), 300);
@@ -703,23 +1102,17 @@ function handleFailure(player) {
     }
 
     if (player.lives <= 0) {
-        let winnerName;
+        let winnerName = gameState.mode === 'multi' ? (remotePlayer ? remotePlayer.name : 'Opponent') : null;
         if (gameState.bossMode) {
-            winnerName = `${gameState.bossName} Wins!`;
-        } else {
-            winnerName = gameState.mode === 'solo' ? null : (remotePlayer ? remotePlayer.name : 'Opponent');
+            winnerName = `Survived to Wave ${gameState.currentWave}`;
         }
         gameOver(winnerName);
-        if(gameState.mode === 'multi' && !gameState.bossMode) sendData({ type: 'game_over', winnerName: remotePlayer.name });
-        if(gameState.mode === 'multi' && gameState.bossMode) sendData({ type: 'game_over', winnerName: `${gameState.bossName} Wins!` });
+        if(gameState.mode === 'multi') sendData({ type: 'game_over', winnerName: remotePlayer.name });
 
     } else {
         setTimeout(() => {
-            player.startNewSequence();
-            if (gameState.mode === 'multi') {
-                sendData({ type: 'new_sequence', sequence: player.currentSequence, combo: player.combo });
-            } else {
-                hostCheckBossTrigger();
+            if (!gameState.pendingNextWave) {
+                player.startNewSequence();
             }
         }, 300);
     }
@@ -735,16 +1128,17 @@ function handleRemoteKeyPress(progress) {
 function resetGame() {
     if (!localPlayer) return;
     DOMElements.gameOverScreen.classList.remove('visible');
-    DOMElements.player1Container.classList.remove('is-local-player', 'is-remote-player');
-    DOMElements.player2Container.classList.remove('is-local-player', 'is-remote-player');
-
 
     gameState.status = 'playing';
+    gameState.isTransitioning = false;
+    gameState.pendingNextWave = false;
     gameState.sequenceTurnCounter = 0;
     gameState.bossIsEnraged = false;
-    if(gameState.bossMode) {
-        initBoss();
-    }
+    gameState.currentWave = 1;
+    gameState.isCrescendoWave = false;
+    
+    touchStartX = 0;
+    touchStartY = 0;
 
     [localPlayer, remotePlayer].forEach(p => {
         if (p) {
@@ -753,28 +1147,38 @@ function resetGame() {
             p.successfulSequences = 0;
             p.highestCombo = 0;
             p.damageDealt = 0;
+            p.speedBoostActive = false;
+            p.isIdle = true;
         }
     });
+    
+    const playerData = loadPlayerData();
+    localPlayer.updateLevel(playerData.highestWave);
 
     if (gameState.mode === 'solo') {
-        localPlayer.startNewSequence();
+        if (gameState.bossMode) {
+            startWave(1);
+        } else {
+            localPlayer.startNewSequence();
+        }
     } else if (gameState.isHost) {
-        localPlayer.startNewSequence();
-        sendData({ type: 'new_sequence', sequence: player.currentSequence, combo: player.combo });
-        
-        const guestSequence = Array.from({ length: 3 }, () => ARROW_KEYS[Math.floor(Math.random() * 4)]);
-        remotePlayer.startNewSequence(guestSequence);
-        sendData({ type: 'start_game', sequence: guestSequence });
+        startCountdown();
+        sendData({type: 'start_countdown'});
     }
 }
 
 function gameOver(winnerName) {
+    if (gameState.status === 'gameover') return;
     gameState.status = 'gameover';
-    [localPlayer, remotePlayer].forEach(p => { if(p) cancelAnimationFrame(p.timerId) });
+    
+    [localPlayer, remotePlayer].forEach(p => { 
+        if(p) cancelAnimationFrame(p.timerId);
+    });
 
     const titleEl = DOMElements.gameOverTitle;
-    const titleText = 'GAME OVER';
-    titleEl.innerHTML = ''; // Clear previous title
+    titleEl.innerHTML = '';
+    
+    const titleText = gameState.bossMode ? 'RUN COMPLETE' : 'GAME OVER';
 
     titleText.split('').forEach((char, index) => {
         const span = document.createElement('span');
@@ -790,8 +1194,7 @@ function gameOver(winnerName) {
     } else {
         DOMElements.winnerNameDisplay.style.display = 'none';
     }
-
-    // Display Stats
+    
     DOMElements.statsCombo.textContent = localPlayer.highestCombo;
     DOMElements.statsCleared.textContent = localPlayer.successfulSequences;
     if (gameState.bossMode) {
@@ -843,7 +1246,7 @@ function handleTouchStart(evt) {
 }
 
 function handleTouchMove(evt) {
-    evt.preventDefault(); // Prevent scrolling while swiping
+    evt.preventDefault();
 }
 
 function handleTouchEnd(evt) {
@@ -856,22 +1259,19 @@ function handleTouchEnd(evt) {
 
     let swipeDirection = '';
     if (Math.abs(diffX) > Math.abs(diffY)) {
-        // Horizontal swipe
         if (Math.abs(diffX) > 30) {
             swipeDirection = diffX > 0 ? 'ArrowRight' : 'ArrowLeft';
         }
     } else {
-        // Vertical swipe
         if (Math.abs(diffY) > 30) {
             swipeDirection = diffY > 0 ? 'ArrowDown' : 'ArrowUp';
         }
     }
 
     if (swipeDirection) {
-        handleKeyPress(swipeDirection);
+        handleKeyPress({key: swipeDirection, preventDefault: () => {}}); //Simulate key press
     }
 
-    // Reset values
     touchStartX = 0;
     touchStartY = 0;
 }
@@ -884,7 +1284,7 @@ function setVideoBackground() {
         return;
     }
 
-    const youtubeIdMatch = url.match(/(?:v=|youtu\.be\/|embed\/|watch\?v=|&v=)([^&?#]+)/);
+    const youtubeIdMatch = url.match(/(?:v=|youtu\.be\/|embed\/|watch?v=|&v=)([^&?#]+)/);
 
     if (youtubeIdMatch && youtubeIdMatch[1]) {
         const videoId = youtubeIdMatch[1];
@@ -917,3 +1317,4 @@ function addChatMessage(message, type) {
 }
 
 init();
+

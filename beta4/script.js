@@ -211,7 +211,6 @@ function listenForKeybind(action, btnElement) {
 const BOSS_NAMES = ["Sonus", "Tremor", "Siren", "Symphony", "Echo"]; // Echoes
 const MENACING_BOSS_NAMES = ["Sonoris", "Noctaria", "Legion", "Echolyra", "Stellaria", "Orbisona"]; // Crescendos
 const BOSS_ELEMENTS = ["fire", "poison", "ice"];
-// --- NEW ATTACKS ADDED ---
 const BOSS_ACTIONS = ["timer_burn", "blur", "stealth", "heal", "seismic_shift", "rhythm_shift", "stagger", "blur_stealth"];
 const ATTACK_NAMES = {
     timer_burn: 'TIMER BURN',
@@ -269,8 +268,8 @@ class Player {
         this.successfulSequences = 0;
         this.timeLimit = 10000;
         this.timerId = null;
-        this.timerStartTime = 0; // For hyperspeed
-        this.timeBonus = 0;      // For hyperspeed
+        this.timerStartTime = 0;
+        this.timeBonus = 0;
         this.hyperspeedActive = false;
         this.decayActive = false;
         this.highestCombo = 0;
@@ -323,32 +322,22 @@ class Player {
         } else {
             this.dom.comboContainer.classList.remove('visible');
         }
+        
+        // --- NEW UNIFIED FEVER LOGIC ---
+        // Visuals (Grid Glow + Text) start at 15
+        const feverIsActive = this.combo >= 15;
+        const wasFeverActive = this.dom.grid.classList.contains('combo-fever');
 
-        // --- HYPERSPEED AND FEVER NOTIFICATION LOGIC ---
-        const wasHyperspeedActive = this.hyperspeedActive;
-        this.hyperspeedActive = this.combo >= 30;
-
-        if(this.hyperspeedActive && !wasHyperspeedActive) {
+        if (feverIsActive && !wasFeverActive) {
+            this.dom.grid.classList.add('combo-fever');
             this.dom.feverText.classList.remove('hidden');
-        } else if (!this.hyperspeedActive && wasHyperspeedActive) {
+        } else if (!feverIsActive && wasFeverActive) {
+            this.dom.grid.classList.remove('combo-fever');
             this.dom.feverText.classList.add('hidden');
         }
 
-
-        if (this.combo >= 50) {
-            this.dom.grid.classList.add('combo-fever');
-            if (this.combo % 10 === 0) {
-                const colorIndex = (this.combo / 10) % COMBO_COLORS.length;
-                this.dom.grid.style.setProperty('--glow-color', COMBO_COLORS[colorIndex]);
-            }
-            const vibrancyLevel = Math.floor(this.combo / 100);
-            const glowSize = 25 + (vibrancyLevel * 10);
-            this.dom.grid.style.setProperty('--glow-size', `${glowSize}px`);
-        } else {
-            this.dom.grid.classList.remove('combo-fever');
-        }
-
-        this.speedBoostActive = this.combo >= 100;
+        // Gameplay effect (Hyperspeed) starts at 30
+        this.hyperspeedActive = this.combo >= 30;
     }
 
     updateLevel(newLevel) {
@@ -372,22 +361,19 @@ class Player {
         
         // --- DIFFICULTY SCALING: ACCELERATED DECAY ---
         const baseTime = 10000;
-        let timeReduction = gameState.currentWave * 100; // Base reduction
+        let timeReduction = gameState.currentWave * 100;
         if (gameState.currentWave >= 4) {
-            // Additional, steeper reduction for higher waves
             timeReduction += (gameState.currentWave - 3) * 200;
         }
         this.timeLimit = Math.max(3000, baseTime - timeReduction);
 
-        // --- DIFFICULTY SCALING: HYPERSPEED ---
         if (this.hyperspeedActive) {
-            this.timeLimit *= 0.75; // 25% faster
+            this.timeLimit *= 0.75;
         }
         
         cancelAnimationFrame(this.timerId);
         this.sequenceProgress = 0;
 
-        // --- DIFFICULTY SCALING: COMPLEX PATTERNS ---
         if (!sequence) {
             if (gameState.isCrescendoWave) {
                 this.sequenceLength = Math.floor(Math.random() * 4) + 9;
@@ -400,7 +386,7 @@ class Player {
                     this.sequenceLength = 12;
                 }
             }
-
+            // --- DIFFICULTY SCALING: COMPLEX PATTERNS ---
             if (gameState.currentWave >= 4) {
                 this.currentSequence = generateComplexSequence(this.sequenceLength);
             } else {
@@ -446,7 +432,7 @@ class Player {
 
     startTimer() {
         this.timerStartTime = Date.now();
-        this.timeBonus = 0; // Reset time bonus for the new sequence
+        this.timeBonus = 0;
         const update = () => {
             const elapsedTime = Date.now() - this.timerStartTime - this.timeBonus;
             const remainingPercent = Math.max(0, 100 - (elapsedTime / this.timeLimit) * 100);
@@ -892,16 +878,13 @@ function hostCheckBossTrigger() {
 }
 
 function triggerBossAction() {
-    // --- DIFFICULTY SCALING: ATTACK OVERLAPS ---
-    let availableActions = [...BOSS_ACTIONS];
-    // After wave 4, add a chance for more complex attacks
+    let availableActions = ["timer_burn", "blur", "stealth", "heal", "seismic_shift", "rhythm_shift"];
     if (gameState.currentWave >= 4) {
-        if(gameState.isCrescendoWave) {
-            availableActions.push('blur_stealth'); // Only Crescendos can do combo attacks
-        }
         availableActions.push('stagger');
+        if (gameState.isCrescendoWave) {
+            availableActions.push('blur_stealth');
+        }
     }
-    // Filter out 'heal' if boss is at full health
     if (gameState.bossCurrentHealth === gameState.bossMaxHealth) {
         availableActions = availableActions.filter(action => action !== 'heal');
     }
@@ -972,9 +955,8 @@ function applyBossAttack(attackType, player) {
             }
             break;
         case 'blur':
-            const blurDuration = gameState.bossIsEnraged ? 4500 : 3000;
             player.dom.grid.classList.add('blurred');
-            setTimeout(() => player.dom.grid.classList.remove('blurred'), blurDuration);
+            setTimeout(() => player.dom.grid.classList.remove('blurred'), 3000);
             break;
         case 'stealth':
             player.dom.sequenceContainer.classList.add('stealth');
@@ -986,13 +968,11 @@ function applyBossAttack(attackType, player) {
         case 'rhythm_shift':
             player.decayActive = true;
             return;
-        // --- NEW ATTACK LOGIC ---
         case 'stagger':
             displaySequenceStaggered(player);
             break;
         case 'blur_stealth':
             player.dom.grid.classList.add('blurred');
-            // Hide the sequence after a moment of seeing it blurred
             setTimeout(() => {
                 player.dom.sequenceContainer.classList.add('stealth');
             }, 1000);
@@ -1002,9 +982,9 @@ function applyBossAttack(attackType, player) {
 
 function displaySequenceStaggered(player) {
     const container = player.dom.sequenceContainer;
-    container.innerHTML = ''; // Clear existing arrows
+    container.innerHTML = ''; 
     const sequence = player.currentSequence;
-    const revealDelay = 300; // ms between each arrow appearing
+    const revealDelay = 300;
 
     sequence.forEach((arrowKey, index) => {
         setTimeout(() => {
@@ -1012,10 +992,9 @@ function displaySequenceStaggered(player) {
         }, index * revealDelay);
     });
 
-    // Hide the whole sequence after the last one has appeared
     setTimeout(() => {
         container.classList.add('stealth');
-    }, sequence.length * revealDelay + 500); // Give player 500ms to see the full sequence
+    }, sequence.length * revealDelay + 500);
 }
 
 
@@ -1138,7 +1117,7 @@ function handleCorrectKeyPress(player) {
         setTimeout(() => player.dom.grid.classList.remove('success-glow'), 500);
         
         if (player.hyperspeedActive) {
-            player.timeBonus += 500; // Add 500ms back to the timer
+            player.timeBonus += 500;
         }
         
         player.isIdle = true;
@@ -1230,8 +1209,6 @@ function resetGame() {
             p.successfulSequences = 0;
             p.highestCombo = 0;
             p.damageDealt = 0;
-            p.speedBoostActive = false;
-            p.hyperspeedActive = false;
             p.isIdle = true;
         }
     });

@@ -23,6 +23,20 @@ function triggerLevelUpEffect() {
     }, 2500);
 }
 
+// --- NEW HELPER FOR COMPLEX SEQUENCES ---
+function generateComplexSequence(length) {
+    const sequence = [];
+    for (let i = 0; i < length; i++) {
+        let nextArrow;
+        do {
+            nextArrow = ARROW_KEYS[Math.floor(Math.random() * 4)];
+        // Prevent more than two of the same arrow in a row
+        } while (i > 1 && nextArrow === sequence[i - 1] && nextArrow === sequence[i - 2]);
+        sequence.push(nextArrow);
+    }
+    return sequence;
+}
+
 
 const DOMElements = {
     titleScreen: document.getElementById('title-screen'),
@@ -203,7 +217,9 @@ const ATTACK_NAMES = {
     blur: 'DISTORTION FIELD',
     stealth: 'STEALTH SEQUENCE',
     seismic_shift: 'SEISMIC SHIFT',
-    rhythm_shift: 'DECAY'
+    rhythm_shift: 'DECAY',
+    stagger: 'STAGGERED PULSE',
+    blur_stealth: 'DISTORTED STEALTH'
 };
 const ARROW_SVG = {
     'ArrowUp': `<svg class="arrow-icon" viewBox="0 0 100 100"><path class="arrow-bg" fill="url(#grad-up)" d="M50,0 L100,50 L85,65 L50,30 L15,65 L0,50 Z"></path><path class="arrow-shape" fill="rgba(255,255,255,0.8)" d="M50,15 L80,45 L68,57 L50,39 L32,57 L20,45 Z"></path></svg>`,
@@ -251,18 +267,19 @@ class Player {
         this.sequenceProgress = 0;
         this.successfulSequences = 0;
         this.timeLimit = 10000;
-        this.sequenceLength = 3;
-        this.currentSequence = [];
         this.timerId = null;
+        this.timerStartTime = 0;
+        this.timeBonus = 0;
+        this.hyperspeedActive = false;
         this.decayActive = false;
         this.highestCombo = 0;
         this.damageDealt = 0;
-        this.speedBoostActive = false;
 
         this.dom = {
             playerArea: document.getElementById(`player${id}-container`),
             attackAnnouncement: document.getElementById(`attack-announcement-p${id}`),
             levelupText: document.getElementById(`levelup-p${id}`),
+            feverText: document.getElementById(`fever-p${id}`),
             name: document.getElementById(`name-p${id}`),
             level: document.getElementById(`level-p${id}`),
             lives: document.getElementById(`lives-p${id}`),
@@ -305,20 +322,18 @@ class Player {
             this.dom.comboContainer.classList.remove('visible');
         }
 
-        if (this.combo >= 50) {
+        const feverIsActive = this.combo >= 15;
+        const wasFeverActive = this.dom.grid.classList.contains('combo-fever');
+
+        if (feverIsActive && !wasFeverActive) {
             this.dom.grid.classList.add('combo-fever');
-            if (this.combo % 10 === 0) {
-                const colorIndex = (this.combo / 10) % COMBO_COLORS.length;
-                this.dom.grid.style.setProperty('--glow-color', COMBO_COLORS[colorIndex]);
-            }
-            const vibrancyLevel = Math.floor(this.combo / 100);
-            const glowSize = 25 + (vibrancyLevel * 10);
-            this.dom.grid.style.setProperty('--glow-size', `${glowSize}px`);
-        } else {
+            this.dom.feverText.classList.remove('hidden');
+        } else if (!feverIsActive && wasFeverActive) {
             this.dom.grid.classList.remove('combo-fever');
+            this.dom.feverText.classList.add('hidden');
         }
 
-        this.speedBoostActive = this.combo >= 100;
+        this.hyperspeedActive = this.combo >= 30;
     }
 
     updateLevel(newLevel) {
@@ -338,20 +353,17 @@ class Player {
         }
 
         this.dom.sequenceContainer.classList.remove('stealth');
+        this.dom.grid.classList.remove('blurred');
         
-        const timerBarContainer = this.dom.timerBar.parentElement;
-        if (this.decayActive) {
-            this.timeLimit = 5000;
-            timerBarContainer.classList.add('decay-active');
-            this.decayActive = false;
-        } else {
-            const baseTime = 10000;
-            const timeReduction = gameState.currentWave * 150;
-            this.timeLimit = Math.max(3500, baseTime - timeReduction);
+        const baseTime = 10000;
+        let timeReduction = gameState.currentWave * 100;
+        if (gameState.currentWave >= 4) {
+            timeReduction += (gameState.currentWave - 3) * 200;
         }
-        
-        if (this.speedBoostActive) {
-            this.timeLimit *= 0.8;
+        this.timeLimit = Math.max(3000, baseTime - timeReduction);
+
+        if (this.hyperspeedActive) {
+            this.timeLimit *= 0.75;
         }
         
         cancelAnimationFrame(this.timerId);
@@ -369,7 +381,12 @@ class Player {
                     this.sequenceLength = 12;
                 }
             }
-            this.currentSequence = Array.from({ length: this.sequenceLength }, () => ARROW_KEYS[Math.floor(Math.random() * 4)]);
+            if (gameState.currentWave >= 4) {
+                this.currentSequence = generateComplexSequence(this.sequenceLength);
+            } else {
+                this.currentSequence = Array.from({ length: this.sequenceLength }, () => ARROW_KEYS[Math.floor(Math.random() * 4)]);
+            }
+
         } else {
             this.currentSequence = sequence;
         }
@@ -408,9 +425,10 @@ class Player {
     }
 
     startTimer() {
-        let startTime = Date.now();
+        this.timerStartTime = Date.now();
+        this.timeBonus = 0;
         const update = () => {
-            const elapsedTime = Date.now() - startTime;
+            const elapsedTime = Date.now() - this.timerStartTime - this.timeBonus;
             const remainingPercent = Math.max(0, 100 - (elapsedTime / this.timeLimit) * 100);
             this.dom.timerBar.style.width = `${remainingPercent}%`;
 
@@ -854,7 +872,18 @@ function hostCheckBossTrigger() {
 }
 
 function triggerBossAction() {
-    const action = BOSS_ACTIONS[Math.floor(Math.random() * BOSS_ACTIONS.length)];
+    let availableActions = ["timer_burn", "blur", "stealth", "heal", "seismic_shift", "rhythm_shift"];
+    if (gameState.currentWave >= 4) {
+        availableActions.push('stagger');
+        if (gameState.isCrescendoWave) {
+            availableActions.push('blur_stealth');
+        }
+    }
+    if (gameState.bossCurrentHealth === gameState.bossMaxHealth) {
+        availableActions = availableActions.filter(action => action !== 'heal');
+    }
+
+    const action = availableActions[Math.floor(Math.random() * availableActions.length)];
     
     if (action === 'heal') {
         DOMElements.bossArea.classList.add('boss-healing');
@@ -904,13 +933,7 @@ function showAttackAnnouncement(attackType, player, isDramatic = false) {
 function applyBossAttack(attackType, player) {
     if (!player) return;
     
-    if (attackType === 'rhythm_shift') {
-        showAttackAnnouncement(attackType, player, true);
-        player.decayActive = true;
-        return;
-    }
-    
-    showAttackAnnouncement(attackType, player, false);
+    showAttackAnnouncement(attackType, player, attackType === 'rhythm_shift');
     player.dom.playerArea.classList.add('shake');
     setTimeout(() => player.dom.playerArea.classList.remove('shake'), 500);
 
@@ -926,9 +949,8 @@ function applyBossAttack(attackType, player) {
             }
             break;
         case 'blur':
-            const blurDuration = gameState.bossIsEnraged ? 4500 : 3000;
             player.dom.grid.classList.add('blurred');
-            setTimeout(() => player.dom.grid.classList.remove('blurred'), blurDuration);
+            setTimeout(() => player.dom.grid.classList.remove('blurred'), 3000);
             break;
         case 'stealth':
             player.dom.sequenceContainer.classList.add('stealth');
@@ -937,17 +959,56 @@ function applyBossAttack(attackType, player) {
             player.dom.grid.classList.add('grid-tilting');
             setTimeout(() => player.dom.grid.classList.remove('grid-tilting'), 3000);
             break;
+        case 'rhythm_shift':
+            player.decayActive = true;
+            return;
+        case 'stagger':
+            displaySequenceStaggered(player);
+            break;
+        case 'blur_stealth':
+            player.dom.grid.classList.add('blurred');
+            setTimeout(() => {
+                player.dom.sequenceContainer.classList.add('stealth');
+            }, 1000);
+            break;
     }
 }
+
+function displaySequenceStaggered(player) {
+    const container = player.dom.sequenceContainer;
+    container.innerHTML = ''; 
+    const sequence = player.currentSequence;
+    const revealDelay = 300;
+
+    sequence.forEach((arrowKey, index) => {
+        setTimeout(() => {
+            container.innerHTML += ARROW_SVG[arrowKey];
+        }, index * revealDelay);
+    });
+
+    setTimeout(() => {
+        container.classList.add('stealth');
+    }, sequence.length * revealDelay + 500);
+}
+
 
 function playDeathAnimation(isCrescendo) {
     return new Promise(resolve => {
         const duration = isCrescendo ? 1500 : 1000;
         const container = DOMElements.bossHealthBarContainer;
+        const mainBar = DOMElements.bossHealthBar;
+        const shards = container.querySelectorAll('.health-bar-shard');
+
+        const mainBarStyle = getComputedStyle(mainBar).background;
+        shards.forEach(shard => {
+            shard.style.background = mainBarStyle;
+        });
+
         container.classList.add(isCrescendo ? 'crescendo-defeated' : 'defeated');
-        
+
         setTimeout(() => {
             container.classList.remove('crescendo-defeated', 'defeated');
+            shards.forEach(shard => shard.style.background = ''); 
             resolve();
         }, duration);
     });
@@ -1058,6 +1119,10 @@ function handleCorrectKeyPress(player) {
         player.dom.grid.classList.add('success-glow');
         setTimeout(() => player.dom.grid.classList.remove('success-glow'), 500);
         
+        if (player.hyperspeedActive) {
+            player.timeBonus += 500;
+        }
+        
         player.isIdle = true;
         if(player.isLocal && gameState.mode === 'multi' && conn) {
             sendData({ type: 'player_state_update', isIdle: player.isIdle });
@@ -1147,7 +1212,6 @@ function resetGame() {
             p.successfulSequences = 0;
             p.highestCombo = 0;
             p.damageDealt = 0;
-            p.speedBoostActive = false;
             p.isIdle = true;
         }
     });
@@ -1317,4 +1381,3 @@ function addChatMessage(message, type) {
 }
 
 init();
-

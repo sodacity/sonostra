@@ -274,7 +274,6 @@ class Player {
         this.decayActive = false;
         this.highestCombo = 0;
         this.damageDealt = 0;
-        this.speedBoostActive = false;
 
         this.dom = {
             playerArea: document.getElementById(`player${id}-container`),
@@ -873,7 +872,7 @@ function hostCheckBossTrigger() {
 }
 
 function triggerBossAction() {
-    let availableActions = [...BOSS_ACTIONS];
+    let availableActions = ["timer_burn", "blur", "stealth", "heal", "seismic_shift", "rhythm_shift"];
     if (gameState.currentWave >= 4) {
         availableActions.push('stagger');
         if (gameState.isCrescendoWave) {

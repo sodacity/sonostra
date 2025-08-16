@@ -1,1019 +1,1383 @@
-/* --- Base Setup & Theming --- */
-:root {
-    --background-color: #121212;
-    --glass-bg: rgba(22, 22, 22, 0.6);
-    --glass-border: rgba(255, 255, 255, 0.2);
-    --text-color: #EAEAEA;
-    --primary-color: #03A9F4;
-    --secondary-color: #FF00FF;
-    --success-color: #4CAF50;
-    --danger-color: #F44336;
-    --font-body: 'Roboto', sans-serif;
-    --font-display: 'Orbitron', sans-serif;
-    --font-title: 'Audiowide', cursive;
+// --- NEW HELPER FUNCTIONS FOR PLAYER LEVEL ---
+function loadPlayerData() {
+    const saved = localStorage.getItem('sonostraPlayerData');
+    if (saved) {
+        return JSON.parse(saved);
+    }
+    return { highestWave: 0 }; // Default data if none is saved
 }
 
-* { box-sizing: border-box; margin: 0; padding: 0; }
-
-body {
-    font-family: var(--font-body);
-    background-color: var(--background-color);
-    color: var(--text-color);
-    overflow: hidden;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    min-height: 100vh;
+function savePlayerData(data) {
+    localStorage.setItem('sonostraPlayerData', JSON.stringify(data));
 }
 
-/* --- Title Screen --- */
-#title-screen {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background: var(--background-color);
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    z-index: 9999;
-    transition: opacity 0.8s ease-out;
-    opacity: 1;
+function triggerLevelUpEffect() {
+    const levelUpSound = new Audio('https://www.sonostra.com/levelup.mp3');
+    levelUpSound.play();
+
+    // Show the local player's specific level up text
+    const announcement = localPlayer.dom.levelupText;
+    announcement.classList.remove('hidden');
+    setTimeout(() => {
+        announcement.classList.add('hidden');
+    }, 2500);
 }
-#title-screen.hidden {
-    opacity: 0;
-    pointer-events: none;
-}
-.title-main {
-    font-family: var(--font-title);
-    font-size: clamp(4rem, 15vw, 10rem);
-    background: linear-gradient(45deg, var(--primary-color), var(--secondary-color));
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    filter: drop-shadow(3px 3px 8px rgba(0,0,0,0.7));
-    margin-bottom: 2rem;
-}
-#press-start-text {
-    font-family: var(--font-display);
-    font-size: clamp(1rem, 3vw, 1.5rem);
-    letter-spacing: 2px;
-    animation: flash 1.5s infinite ease-in-out;
-}
-@keyframes flash {
-    0%, 100% { opacity: 1; text-shadow: 0 0 5px rgba(255,255,255,0.5); }
-    50% { opacity: 0.3; text-shadow: none; }
+
+// --- NEW HELPER FOR COMPLEX SEQUENCES ---
+function generateComplexSequence(length) {
+    const sequence = [];
+    for (let i = 0; i < length; i++) {
+        let nextArrow;
+        do {
+            nextArrow = ARROW_KEYS[Math.floor(Math.random() * 4)];
+        // Prevent more than two of the same arrow in a row
+        } while (i > 1 && nextArrow === sequence[i - 1] && nextArrow === sequence[i - 2]);
+        sequence.push(nextArrow);
+    }
+    return sequence;
 }
 
 
-/* --- Video Wall --- */
-#video-wall-container {
-    position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-    z-index: -1; overflow: hidden; background-color: #000;
-}
-#video-wall-container .overlay {
-    position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-    background-color: rgba(0,0,0,0.3);
-}
-#video-wall-container iframe {
-    position: absolute; top: 50%; left: 50%;
-    width: 178vh; min-width: 100vw;
-    height: 56.25vw; min-height: 100vh;
-    transform: translate(-50%, -50%);
-    pointer-events: none;
-}
-#video-wall-container video {
-     position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-     object-fit: cover;
-     pointer-events: none;
+const DOMElements = {
+    titleScreen: document.getElementById('title-screen'),
+    connectionSetup: document.getElementById('connection-setup'),
+    gameArea: document.getElementById('game-area'),
+    videoUrlInput: document.getElementById('video-url-input'),
+    videoWallContainer: document.getElementById('video-wall-container'),
+    startBtn: document.getElementById('start-btn'),
+    joinBtn: document.getElementById('join-btn'),
+    gameModeToggle: document.getElementById('game-mode-toggle'),
+    bossModeToggle: document.getElementById('boss-mode-toggle'),
+    bossModeContainer: document.getElementById('boss-mode-container'),
+    player1Container: document.getElementById('player1-container'),
+    player2Container: document.getElementById('player2-container'),
+    playerNameInput: document.getElementById('player-name-input'),
+    roomNameInput: document.getElementById('room-name-input'),
+    chatContainer: document.getElementById('popup-chat-container'),
+    chatInput: document.getElementById('chat-input'),
+    chatSendBtn: document.getElementById('chat-send-btn'),
+    chatBubbles: document.getElementById('chat-bubbles'),
+    chatInputContainer: document.getElementById('chat-input-container'),
+    gameOverScreen: document.getElementById('game-over-screen'),
+    gameOverTitle: document.getElementById('game-over-title'),
+    winnerNameDisplay: document.getElementById('winner-name-display'),
+    rematchBtn: document.getElementById('rematch-btn'),
+    bossArea: document.getElementById('boss-area'),
+    bossSymbol: document.getElementById('boss-symbol'),
+    bossName: document.getElementById('boss-name'),
+    bossLevel: document.getElementById('boss-level'),
+    bossHealthBar: document.getElementById('boss-health-bar'),
+    bossHealthBarContainer: document.getElementById('boss-health-bar-container'),
+    fullscreenBtn: document.getElementById('fullscreen-btn'),
+    fullscreenIcon: document.getElementById('fullscreen-icon'),
+    exitFullscreenIcon: document.getElementById('exit-fullscreen-icon'),
+    statsCombo: document.getElementById('stats-combo'),
+    statsCleared: document.getElementById('stats-cleared'),
+    statsDamage: document.getElementById('stats-damage'),
+    damageStatContainer: document.getElementById('damage-stat-container'),
+    nextVideoInput: document.getElementById('next-video-input'),
+    changeVideoBtn: document.getElementById('change-video-btn'),
+    lobbyOverlay: document.getElementById('lobby-overlay'),
+    lobbyText: document.getElementById('lobby-text'),
+    waveAnnouncement: document.getElementById('wave-announcement'),
+    warningEncounter: document.getElementById('warning-encounter'),
+    rewardAnnouncement: document.getElementById('reward-announcement'),
+    settingsBtn: document.getElementById('settings-btn'),
+    settingsScreen: document.getElementById('settings-screen'),
+    bindUpBtn: document.getElementById('bind-up-btn'),
+    bindDownBtn: document.getElementById('bind-down-btn'),
+    bindLeftBtn: document.getElementById('bind-left-btn'),
+    bindRightBtn: document.getElementById('bind-right-btn'),
+    colorUpInput: document.getElementById('color-up-input'),
+    colorDownInput: document.getElementById('color-down-input'),
+    colorLeftInput: document.getElementById('color-left-input'),
+    colorRightInput: document.getElementById('color-right-input'),
+    colorGridInput: document.getElementById('color-grid-input'),
+    saveSettingsBtn: document.getElementById('save-settings-btn'),
+    defaultsSettingsBtn: document.getElementById('defaults-settings-btn'),
+    closeSettingsBtn: document.getElementById('close-settings-btn'),
+};
+
+// --- Settings Management ---
+const defaultSettings = {
+    playerName: '',
+    keyBinds: { ArrowUp: 'ArrowUp', ArrowDown: 'ArrowDown', ArrowLeft: 'ArrowLeft', ArrowRight: 'ArrowRight' },
+    colors: { up: '#2979FF', down: '#FF1744', left: '#7C4DFF', right: '#00E676', grid: '#161616' }
+};
+let currentSettings = JSON.parse(JSON.stringify(defaultSettings));
+
+function hexToRgba(hex, alpha) {
+    let r = 0, g = 0, b = 0;
+    if (hex.length == 4) {
+        r = "0x" + hex[1] + hex[1];
+        g = "0x" + hex[2] + hex[2];
+        b = "0x" + hex[3] + hex[3];
+    } else if (hex.length == 7) {
+        r = "0x" + hex[1] + hex[2];
+        g = "0x" + hex[3] + hex[4];
+        b = "0x" + hex[5] + hex[6];
+    }
+    return `rgba(${+r},${+g},${+b},${alpha})`;
 }
 
+function applySettings() {
+    document.getElementById('grad-up-1').style.stopColor = currentSettings.colors.up;
+    document.getElementById('grad-up-2').style.stopColor = currentSettings.colors.up;
+    document.getElementById('grad-down-1').style.stopColor = currentSettings.colors.down;
+    document.getElementById('grad-down-2').style.stopColor = currentSettings.colors.down;
+    document.getElementById('grad-left-1').style.stopColor = currentSettings.colors.left;
+    document.getElementById('grad-left-2').style.stopColor = currentSettings.colors.left;
+    document.getElementById('grad-right-1').style.stopColor = currentSettings.colors.right;
+    document.getElementById('grad-right-2').style.stopColor = currentSettings.colors.right;
 
-#game-overlay {
-    width: 100%; height: 100%; padding: 2rem;
-    display: flex; flex-direction: column; align-items: center; justify-content: center;
-    position: relative;
+    const gridBgRgba = hexToRgba(currentSettings.colors.grid, 0.6);
+    document.querySelectorAll('.game-grid').forEach(grid => {
+        grid.style.backgroundColor = gridBgRgba;
+    });
+
+    DOMElements.playerNameInput.value = currentSettings.playerName;
 }
 
-/* Announcement Banner Styles */
-#wave-announcement, #warning-encounter, #reward-announcement {
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    font-family: var(--font-title);
-    color: white;
-    z-index: 300;
-    pointer-events: none;
-    opacity: 0;
+function updateSettingsUI() {
+    DOMElements.playerNameInput.value = currentSettings.playerName;
+    
+    DOMElements.bindUpBtn.textContent = currentSettings.keyBinds.ArrowUp;
+    DOMElements.bindDownBtn.textContent = currentSettings.keyBinds.ArrowDown;
+    DOMElements.bindLeftBtn.textContent = currentSettings.keyBinds.ArrowLeft;
+    DOMElements.bindRightBtn.textContent = currentSettings.keyBinds.ArrowRight;
+    
+    DOMElements.colorUpInput.value = currentSettings.colors.up;
+    DOMElements.colorDownInput.value = currentSettings.colors.down;
+    DOMElements.colorLeftInput.value = currentSettings.colors.left;
+    DOMElements.colorRightInput.value = currentSettings.colors.right;
+    DOMElements.colorGridInput.value = currentSettings.colors.grid;
 }
-#wave-announcement {
-    font-size: clamp(3rem, 10vw, 6rem);
-    text-shadow: 0 0 15px white, 0 0 30px var(--primary-color);
-    animation: fade-in-out-zoom 2s ease-in-out forwards;
+
+function saveSettings() {
+    currentSettings.playerName = DOMElements.playerNameInput.value;
+    currentSettings.colors.up = DOMElements.colorUpInput.value;
+    currentSettings.colors.down = DOMElements.colorDownInput.value;
+    currentSettings.colors.left = DOMElements.colorLeftInput.value;
+    currentSettings.colors.right = DOMElements.colorRightInput.value;
+    currentSettings.colors.grid = DOMElements.colorGridInput.value;
+
+    localStorage.setItem('sonostraSettings', JSON.stringify(currentSettings));
+
+    const saveBtn = DOMElements.saveSettingsBtn;
+    saveBtn.textContent = 'Saved!';
+    setTimeout(() => { saveBtn.textContent = 'Save'; }, 1500);
 }
-#reward-announcement {
-    font-size: clamp(2rem, 8vw, 4rem);
-    text-shadow: 0 0 15px var(--success-color);
-    color: var(--success-color);
-    animation: fade-in-out-zoom 1.5s ease-in-out forwards;
+
+function loadSettings() {
+    const saved = localStorage.getItem('sonostraSettings');
+    if (saved) {
+        const savedSettings = JSON.parse(saved);
+        Object.assign(currentSettings.keyBinds, savedSettings.keyBinds);
+        Object.assign(currentSettings.colors, savedSettings.colors);
+        currentSettings.playerName = savedSettings.playerName || '';
+    }
+    applySettings();
+    updateSettingsUI();
 }
-#warning-encounter {
-    font-size: clamp(3rem, 12vw, 7rem);
-    color: var(--danger-color);
-    animation: pulse-warning 2.5s ease-in-out forwards;
+
+function listenForKeybind(action, btnElement) {
+    const listeningBtns = document.querySelectorAll('.listening');
+    if (listeningBtns.length > 0) return;
+
+    btnElement.textContent = 'Press any key...';
+    btnElement.classList.add('listening');
+
+    const handleKeyDown = (e) => {
+        e.preventDefault();
+        const newKey = e.key;
+
+        const isKeyBound = Object.values(currentSettings.keyBinds).includes(newKey);
+        if (isKeyBound && currentSettings.keyBinds[action] !== newKey) {
+            alert(`Key "${newKey}" is already bound to another action.`);
+            btnElement.textContent = currentSettings.keyBinds[action];
+        } else {
+            currentSettings.keyBinds[action] = newKey;
+            btnElement.textContent = newKey;
+        }
+
+        btnElement.classList.remove('listening');
+        window.removeEventListener('keydown', handleKeyDown);
+    };
+
+    window.addEventListener('keydown', handleKeyDown, { once: true });
 }
-.hidden {
-    display: none !important;
-}
-@keyframes fade-in-out-zoom {
-    0% { opacity: 0; transform: translate(-50%, -50%) scale(0.8); }
-    20% { opacity: 1; transform: translate(-50%, -50%) scale(1.1); }
-    80% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
-    100% { opacity: 0; transform: translate(-50%, -50%) scale(0.9); }
-}
-@keyframes pulse-warning {
-    0% { opacity: 0; transform: translate(-50%, -50%) scale(0.9); }
-    20% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
-    35% { text-shadow: 0 0 30px var(--danger-color); }
-    50% { text-shadow: 0 0 15px var(--danger-color); }
-    65% { text-shadow: 0 0 30px var(--danger-color); }
-    80%, 100% { 
-        opacity: 0; 
-        transform: translate(-50%, -50%) scale(0.9);
-        text-shadow: 0 0 15px var(--danger-color);
+
+// --- Game Data ---
+const BOSS_NAMES = ["Sonus", "Tremor", "Siren", "Symphony", "Echo"]; // Echoes
+const MENACING_BOSS_NAMES = ["Sonoris", "Noctaria", "Legion", "Echolyra", "Stellaria", "Orbisona"]; // Crescendos
+const BOSS_ELEMENTS = ["fire", "poison", "ice"];
+const BOSS_ACTIONS = ["timer_burn", "blur", "stealth", "heal", "seismic_shift", "rhythm_shift"];
+const ATTACK_NAMES = {
+    timer_burn: 'TIMER BURN',
+    blur: 'DISTORTION FIELD',
+    stealth: 'STEALTH SEQUENCE',
+    seismic_shift: 'SEISMIC SHIFT',
+    rhythm_shift: 'DECAY',
+    stagger: 'STAGGERED PULSE',
+    blur_stealth: 'DISTORTED STEALTH'
+};
+const ARROW_SVG = {
+    'ArrowUp': `<svg class="arrow-icon" viewBox="0 0 100 100"><path class="arrow-bg" fill="url(#grad-up)" d="M50,0 L100,50 L85,65 L50,30 L15,65 L0,50 Z"></path><path class="arrow-shape" fill="rgba(255,255,255,0.8)" d="M50,15 L80,45 L68,57 L50,39 L32,57 L20,45 Z"></path></svg>`,
+    'ArrowDown': `<svg class="arrow-icon" viewBox="0 0 100 100"><path class="arrow-bg" fill="url(#grad-down)" d="M50,100 L0,50 L15,35 L50,70 L85,35 L100,50 Z"></path><path class="arrow-shape" fill="rgba(255,255,255,0.8)" d="M50,85 L20,55 L32,43 L50,61 L68,43 L80,55 Z"></path></svg>`,
+    'ArrowLeft': `<svg class="arrow-icon" viewBox="0 0 100 100"><path class="arrow-bg" fill="url(#grad-left)" d="M0,50 L50,0 L65,15 L30,50 L65,85 L50,100 Z"></path><path class="arrow-shape" fill="rgba(255,255,255,0.8)" d="M15,50 L45,20 L57,32 L39,50 L57,68 L45,80 Z"></path></svg>`,
+    'ArrowRight': `<svg class="arrow-icon" viewBox="0 0 100 100"><path class="arrow-bg" fill="url(#grad-right)" d="M100,50 L50,100 L35,85 L70,50 L35,15 L50,0 Z"></path><path class="arrow-shape" fill="rgba(255,255,255,0.8)" d="M85,50 L55,80 L43,68 L61,50 L43,32 L55,20 Z"></path></svg>`
+};
+const LIFE_SVG = `<svg class="life-heart" viewBox="0 0 24 24" fill="currentColor"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"></path></svg>`;
+const ARROW_KEYS = ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'];
+const COMBO_COLORS = ['#03A9F4', '#FF00FF', '#FFFF00', '#00E676', '#7C4DFF'];
+
+// --- Game State & Management ---
+let peer, conn;
+let localPlayer, remotePlayer;
+let touchStartX = 0, touchStartY = 0;
+let titleScreenActive = true;
+
+const gameState = {
+    isHost: false,
+    mode: 'solo',
+    bossMode: false,
+    isTransitioning: false,
+    pendingNextWave: false,
+    currentWave: 1,
+    isCrescendoWave: false,
+    bossIsEnraged: false,
+    sequenceTurnCounter: 0,
+    bossName: '',
+    bossLevel: 1,
+    bossMaxHealth: 250,
+    bossCurrentHealth: 250,
+    status: 'setup',
+    videoUrl: '',
+};
+
+class Player {
+    constructor(id, name, isLocal = false) {
+        this.id = id;
+        this.name = name;
+        this.isLocal = isLocal;
+        this.isIdle = true;
+        this.level = 0;
+        this.lives = 3;
+        this.combo = 0;
+        this.sequenceProgress = 0;
+        this.successfulSequences = 0;
+        this.timeLimit = 10000;
+        this.timerId = null;
+        this.timerStartTime = 0;
+        this.timeBonus = 0;
+        this.hyperspeedActive = false;
+        this.decayActive = false;
+        this.highestCombo = 0;
+        this.damageDealt = 0;
+
+        this.dom = {
+            playerArea: document.getElementById(`player${id}-container`),
+            attackAnnouncement: document.getElementById(`attack-announcement-p${id}`),
+            levelupText: document.getElementById(`levelup-p${id}`),
+            feverText: document.getElementById(`fever-p${id}`),
+            name: document.getElementById(`name-p${id}`),
+            level: document.getElementById(`level-p${id}`),
+            lives: document.getElementById(`lives-p${id}`),
+            grid: document.getElementById(`grid-p${id}`),
+            sequenceContainer: document.getElementById(`sequence-p${id}`),
+            timerBar: document.getElementById(`timer-bar-p${id}`),
+            comboContainer: document.getElementById(`combo-p${id}`),
+            comboCount: document.querySelector(`#combo-p${id} .combo-count`),
+            timerEffectFire: document.getElementById(`timer-fire-p${id}`),
+            timerEffectPoison: document.getElementById(`timer-poison-p${id}`),
+            timerEffectIce: document.getElementById(`timer-ice-p${id}`),
+        };
+        this.updateName(name);
+        this.updateLives(3);
+        this.updateCombo(0);
+        this.updateLevel(0);
+    }
+
+    updateName(name) { this.name = name; this.dom.name.textContent = name; }
+
+    updateLives(lives) {
+        this.lives = lives;
+        this.dom.lives.innerHTML = '';
+        for (let i = 0; i < this.lives; i++) { this.dom.lives.innerHTML += LIFE_SVG; }
+
+        if (this.lives === 1) { this.dom.grid.classList.add('danger-state'); }
+        else { this.dom.grid.classList.remove('danger-state'); }
+    }
+
+    updateCombo(combo) {
+        this.combo = combo;
+        this.highestCombo = Math.max(this.highestCombo, this.combo);
+        this.dom.comboCount.textContent = this.combo;
+
+        if (this.combo > 0) {
+            this.dom.comboContainer.classList.add('visible');
+            this.dom.comboCount.classList.add('pop');
+            setTimeout(() => this.dom.comboCount.classList.remove('pop'), 200);
+        } else {
+            this.dom.comboContainer.classList.remove('visible');
+        }
+
+        const feverIsActive = this.combo >= 15;
+        const wasFeverActive = this.dom.grid.classList.contains('combo-fever');
+
+        if (feverIsActive && !wasFeverActive) {
+            this.dom.grid.classList.add('combo-fever');
+            this.dom.feverText.classList.remove('hidden');
+        } else if (!feverIsActive && wasFeverActive) {
+            this.dom.grid.classList.remove('combo-fever');
+            this.dom.feverText.classList.add('hidden');
+        }
+
+        this.hyperspeedActive = this.combo >= 30;
+    }
+
+    updateLevel(newLevel) {
+        this.level = newLevel;
+        if (this.level > 0) {
+            this.dom.level.textContent = `Lvl ${this.level}`;
+            this.dom.level.style.display = 'block';
+        } else {
+            this.dom.level.style.display = 'none';
+        }
+    }
+
+    startNewSequence(sequence = null) {
+        this.isIdle = false;
+        if(this.isLocal && gameState.mode === 'multi' && conn) {
+            sendData({ type: 'player_state_update', isIdle: this.isIdle });
+        }
+
+        this.dom.sequenceContainer.classList.remove('stealth');
+        this.dom.grid.classList.remove('blurred');
+        
+        const baseTime = 10000;
+        let timeReduction = gameState.currentWave * 100;
+        if (gameState.currentWave >= 4) {
+            timeReduction += (gameState.currentWave - 3) * 200;
+        }
+        this.timeLimit = Math.max(3000, baseTime - timeReduction);
+
+        if (this.hyperspeedActive) {
+            this.timeLimit *= 0.75;
+        }
+        
+        cancelAnimationFrame(this.timerId);
+        this.sequenceProgress = 0;
+
+        if (!sequence) {
+            if (gameState.isCrescendoWave) {
+                this.sequenceLength = Math.floor(Math.random() * 4) + 9;
+            } else {
+                const baseLength = 3;
+                const lengthIncrease = Math.floor(gameState.currentWave / 2);
+                this.sequenceLength = Math.min(12, baseLength + lengthIncrease);
+
+                if (this.combo > 0 && this.combo % 9 === 0) {
+                    this.sequenceLength = 12;
+                }
+            }
+            if (gameState.currentWave >= 4) {
+                this.currentSequence = generateComplexSequence(this.sequenceLength);
+            } else {
+                this.currentSequence = Array.from({ length: this.sequenceLength }, () => ARROW_KEYS[Math.floor(Math.random() * 4)]);
+            }
+
+        } else {
+            this.currentSequence = sequence;
+        }
+
+        this.displaySequence();
+        this.startTimer();
+
+        if (this.isLocal && gameState.mode === 'multi' && conn) {
+            sendData({ type: 'new_sequence', sequence: this.currentSequence, combo: this.combo });
+        }
+    }
+
+    displaySequence() {
+        const sequenceLength = this.currentSequence.length;
+        const grid = this.dom.grid;
+        const container = this.dom.sequenceContainer;
+    
+        const availableWidth = grid.offsetWidth - 40; 
+        
+        const maxArrowSize = 80;
+        const minArrowSize = 35;
+    
+        let idealSize = (availableWidth / sequenceLength) - 10; 
+    
+        let finalArrowSize = Math.max(minArrowSize, Math.min(idealSize, maxArrowSize));
+    
+        let finalArrowGap = finalArrowSize * 0.15;
+    
+        container.style.setProperty('--arrow-size', `${finalArrowSize}px`);
+        container.style.setProperty('--arrow-gap', `${finalArrowGap}px`);
+    
+        container.innerHTML = '';
+        this.currentSequence.forEach(arrowKey => {
+            container.innerHTML += ARROW_SVG[arrowKey];
+        });
+    }
+
+    startTimer() {
+        this.timerStartTime = Date.now();
+        this.timeBonus = 0;
+        const update = () => {
+            const elapsedTime = Date.now() - this.timerStartTime - this.timeBonus;
+            const remainingPercent = Math.max(0, 100 - (elapsedTime / this.timeLimit) * 100);
+            this.dom.timerBar.style.width = `${remainingPercent}%`;
+
+            if (elapsedTime >= this.timeLimit) {
+                if (this.isLocal) handleFailure(this);
+            } else {
+                this.timerId = requestAnimationFrame(update);
+            }
+        };
+        this.timerId = requestAnimationFrame(update);
     }
 }
 
+// --- Main Functions ---
+function init() {
+    loadSettings();
+    setupTitleScreenListeners();
+    setupUIListeners();
 
-#fullscreen-btn {
-    position: absolute;
-    top: 1rem;
-    right: 1rem;
-    width: 40px;
-    height: 40px;
-    background: rgba(0,0,0,0.3);
-    border: 1px solid var(--glass-border);
-    border-radius: 50%;
-    padding: 8px;
-    cursor: pointer;
-    z-index: 100;
-}
-#fullscreen-btn svg {
-    width: 100%;
-    height: 100%;
-    fill: white;
-}
-#fullscreen-btn .hidden {
-    display: none;
-}
-
-
-.glass-card {
-    background: var(--glass-bg);
-    backdrop-filter: blur(12px) saturate(150%);
-    -webkit-backdrop-filter: blur(12px) saturate(150%);
-    border: 1px solid var(--glass-border);
-    border-radius: 16px;
-    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
-    padding: 2rem;
-}
-
-/* --- Connection Setup Facelift & Animation --- */
-#connection-setup {
-    width: 100%; max-width: 550px; display: flex;
-    flex-direction: column; gap: 2rem; text-align: center;
-    opacity: 0;
-    pointer-events: none;
-    transform: scale(0.95) translateY(20px);
-    transition: opacity 0.6s ease-out, transform 0.6s ease-out;
-    position: relative; /* For settings button */
-}
-#connection-setup.visible {
-    opacity: 1;
-    pointer-events: auto;
-    transform: scale(1) translateY(0);
-}
-#settings-btn {
-    position: absolute;
-    top: 1rem;
-    right: 1rem;
-    width: 35px;
-    height: 35px;
-    background: rgba(0,0,0,0.2);
-    border: 1px solid var(--glass-border);
-    border-radius: 50%;
-    font-size: 1.5rem;
-    color: white;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transition: background 0.2s, transform 0.2s;
-}
-#settings-btn:hover {
-    background: rgba(0,0,0,0.4);
-    transform: rotate(45deg);
-}
-#connection-setup h1 {
-    font-family: var(--font-title);
-    font-size: 4rem;
-    background: linear-gradient(45deg, var(--primary-color), var(--secondary-color));
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    filter: drop-shadow(2px 2px 4px rgba(0,0,0,0.5));
-}
-.input-group { display: flex; flex-direction: column; gap: 1rem; }
-.input-row { display: flex; gap: 1rem; align-items: center; }
-.input-group input[type="text"] {
-    width: 100%; padding: 1rem 1.25rem; background: rgba(0, 0, 0, 0.3);
-    border: 1px solid var(--glass-border); border-radius: 8px;
-    color: var(--text-color); font-size: 1.1rem; text-align: center;
-    transition: box-shadow 0.3s, border-color 0.3s;
-}
-.input-group input[type="text"]:focus {
-    outline: none;
-    border-color: var(--primary-color);
-    box-shadow: 0 0 15px rgba(3, 169, 244, 0.5);
-}
-.toggle-group {
-    display: flex; justify-content: space-around; align-items: center;
-    background: rgba(0, 0, 0, 0.2); padding: 0.5rem; border-radius: 8px;
-}
-.toggle-switch { display: flex; align-items: center; gap: 0.5rem; cursor: pointer; }
-.toggle-switch span { transition: color 0.3s; }
-.toggle-switch input { display: none; }
-.toggle-switch .slider {
-    position: relative; width: 40px; height: 20px;
-    background-color: #333; border-radius: 10px; transition: background-color 0.3s;
-}
-.toggle-switch .slider:before {
-    content: ''; position: absolute; width: 16px; height: 16px;
-    border-radius: 50%; background-color: white; top: 2px; left: 2px;
-    transition: transform 0.3s;
-}
-.toggle-switch input:checked + .slider { background-color: var(--primary-color); }
-.toggle-switch input:checked + .slider:before { transform: translateX(20px); }
-.button-group { display: flex; gap: 1rem; justify-content: center; }
-.btn {
-    padding: 0.85rem 2rem; border: none; border-radius: 8px;
-    font-size: 1.1rem; font-weight: 700; cursor: pointer;
-    transition: all 0.2s ease; text-transform: uppercase;
-    transform: scale(1);
-}
-.btn:hover {
-    transform: scale(1.05);
-}
-.btn-primary { background: var(--primary-color); color: white; box-shadow: 0 0 10px var(--primary-color), 0 4px 15px rgba(3, 169, 244, 0.3); }
-.btn-primary:hover { background: #0398dc; box-shadow: 0 0 20px var(--primary-color), 0 4px 20px rgba(3, 169, 244, 0.4); }
-.btn-secondary { background: #444; color: #ccc; }
-.btn-secondary:hover { background: #555; }
-
-/* --- Settings Screen --- */
-#settings-screen {
-    position: fixed;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    width: 90%;
-    max-width: 600px;
-    z-index: 500;
-    display: flex;
-    flex-direction: column;
-    gap: 1.5rem;
-}
-#settings-screen.hidden { display: none; }
-#settings-screen h1 {
-    font-family: var(--font-title);
-    text-align: center;
-    font-size: 3rem;
-}
-.settings-section {
-    padding: 1rem;
-    background: rgba(0,0,0,0.2);
-    border-radius: 12px;
-}
-.settings-section h2 {
-    font-family: var(--font-display);
-    margin-bottom: 1rem;
-    text-align: center;
-    color: var(--primary-color);
-}
-.control-grid, .color-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-    gap: 1rem;
-}
-.control-item, .color-item {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 0.5rem;
-}
-.control-item label, .color-item label {
-    font-weight: 500;
-    color: #ccc;
-}
-.control-item button {
-    width: 100%;
-    padding: 0.75rem;
-    font-size: 1rem;
-    font-weight: 700;
-    font-family: var(--font-display);
-    background: rgba(0,0,0,0.3);
-    border: 1px solid var(--glass-border);
-    border-radius: 8px;
-    color: var(--text-color);
-    cursor: pointer;
-    transition: all 0.2s;
-}
-.control-item button:hover {
-    border-color: var(--primary-color);
-    color: var(--primary-color);
-}
-.control-item button.listening {
-    border-color: var(--danger-color);
-    color: var(--danger-color);
-    animation: pulse-red 1s infinite;
-}
-
-input[type="color"] {
-    -webkit-appearance: none;
-    -moz-appearance: none;
-    appearance: none;
-    width: 100%;
-    height: 40px;
-    background-color: transparent;
-    border: 1px solid var(--glass-border);
-    border-radius: 8px;
-    cursor: pointer;
-}
-input[type="color"]::-webkit-color-swatch {
-    border-radius: 6px;
-    border: none;
-}
-input[type="color"]::-moz-color-swatch {
-    border-radius: 6px;
-    border: none;
-}
-
-
-/* --- Lobby Overlay --- */
-#lobby-overlay {
-    position: fixed;
-    top: 0; left: 0; right: 0; bottom: 0;
-    background: rgba(0,0,0,0.8);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    z-index: 150;
-    transition: opacity 0.5s;
-}
-#lobby-overlay.hidden {
-    opacity: 0;
-    pointer-events: none;
-}
-#lobby-text {
-    font-family: var(--font-display);
-    font-size: 3rem;
-    text-align: center;
-    text-shadow: 0 0 10px white;
-}
-#lobby-text.countdown-pop {
-    animation: pop-in 1s;
-}
-
-
-/* --- Game Area --- */
-#game-area { display: none; width: 100%; height: 100%; flex-direction: column; align-items: center; justify-content: center; gap: 1rem;}
-#game-container { display: flex; gap: 2rem; width: 100%; max-width: 1400px; align-items: flex-start; justify-content: center; }
-.player-area { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 0.5rem; position: relative; width: 100%; }
-.player-area.shake { animation: screen-shake 0.5s cubic-bezier(.36,.07,.19,.97) both; }
-.player-header { width: 100%; display: flex; justify-content: space-between; align-items: center; padding: 0 1rem; }
-.player-info {
-    display: flex;
-    flex-direction: column;
-    align-items: flex-start;
-}
-.player-name { font-family: var(--font-display); font-size: 1.5rem; font-weight: 700; }
-.player-level {
-    font-family: var(--font-display);
-    font-size: 1rem;
-    font-weight: 500;
-    color: #ccc;
-    margin-bottom: 0.25rem;
-}
-.player-lives { display: flex; gap: 0.5rem; }
-.life-heart { width: 24px; height: 24px; color: var(--danger-color); filter: drop-shadow(0 0 5px var(--danger-color)); }
-
-.levelup-text {
-    position: absolute;
-    top: 60px; 
-    left: 1rem;
-    font-family: var(--font-title);
-    font-size: 1.5rem;
-    color: #FFD700;
-    text-shadow: 0 0 8px #FFD700;
-    animation: fade-in-out-local 2.5s ease-in-out forwards;
-}
-@keyframes fade-in-out-local {
-    0% { opacity: 0; transform: translateY(10px); }
-    20% { opacity: 1; transform: translateY(0); }
-    80% { opacity: 1; transform: translateY(0); }
-    100% { opacity: 0; transform: translateY(-10px); }
-}
-
-.game-grid { width: 100%; height: 200px; position: relative; overflow: hidden; transition: box-shadow 0.3s, filter 0.2s, transform 0.3s ease-out, background-color 0.3s; -webkit-tap-highlight-color: transparent; }
-.sequence-container {
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    display: flex;
-    gap: var(--arrow-gap, 1rem);
-    transition: transform 0.2s ease-in-out, gap 0.3s ease-in-out;
-    pointer-events: none;
-}
-
-.arrow-icon {
-    width: var(--arrow-size, 64px);
-    height: var(--arrow-size, 64px);
-    opacity: 1;
-    transition: opacity 0.3s, transform 0.3s, width 0.3s ease-in-out, height 0.3s ease-in-out;
-    filter: drop-shadow(0 0 5px rgba(0,0,0,0.5));
-    pointer-events: none;
-    position: relative; 
-}
-.arrow-icon .arrow-bg { transition: fill 0.2s; }
-.arrow-icon .arrow-shape { transition: fill 0.2s; }
-.arrow-icon.correct { opacity: 0; transform: scale(0.8); }
-.arrow-icon.correct .arrow-bg { fill: url(#grad-success) !important; }
-
-/* --- Grid State Animations --- */
-.game-grid.fail-flash { animation: flash-red 0.3s ease; }
-@keyframes flash-red { 0%, 100% { background: var(--glass-bg); } 50% { background: rgba(244, 67, 54, 0.5); } }
-
-.game-grid.success-glow { animation: glow-green 0.5s ease; }
-@keyframes glow-green {
-    0% { box-shadow: 0 0 5px rgba(76, 175, 80, 0), 0 0 5px rgba(76, 175, 80, 0) inset; }
-    50% { box-shadow: 0 0 20px rgba(76, 175, 80, 0.8), 0 0 15px rgba(76, 175, 80, 0.7) inset; }
-    100% { box-shadow: 0 0 5px rgba(76, 175, 80, 0), 0 0 5px rgba(76, 175, 80, 0) inset; }
-}
-
-.game-grid.danger-state { animation: pulse-red 1.5s infinite; }
-@keyframes pulse-red {
-    0% { box-shadow: 0 0 10px rgba(244, 67, 54, 0.5); }
-    50% { box-shadow: 0 0 25px rgba(244, 67, 54, 1); }
-    100% { box-shadow: 0 0 10px rgba(244, 67, 54, 0.5); }
-}
-
-/* --- COMBO FEVER SYSTEM & RAINBOW PULSE --- */
-.game-grid.combo-fever {
-    --glow-color: var(--primary-color);
-    --glow-size: 25px;
-    animation: pulse-glow 1.5s infinite ease-in-out;
-}
-@keyframes pulse-glow {
-    50% {
-        box-shadow: 0 0 var(--glow-size) var(--glow-color), 0 0 calc(var(--glow-size) / 2) var(--glow-color) inset;
+    if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+            navigator.serviceWorker.register('/sw.js').then(registration => {
+                console.log('ServiceWorker registration successful');
+            }).catch(err => {
+                console.log('ServiceWorker registration failed: ', err);
+            });
+        });
     }
 }
 
-@keyframes fever-pulse {
-    0% { transform: scale(1.05); opacity: 0.7; }
-    50% { transform: scale(1.25); opacity: 1; }
-    100% { transform: scale(1.05); opacity: 0.7; }
-}
+function setupTitleScreenListeners() {
+    const proceed = () => {
+        if (!titleScreenActive) return;
+        titleScreenActive = false;
 
-.game-grid.combo-fever .arrow-icon::before {
-    content: '';
-    position: absolute;
-    top: 0; left: 0;
-    width: 100%; height: 100%;
-    z-index: -1;
-    background: linear-gradient(90deg, #ff0000, #ff7f00, #ffff00, #00ff00, #0000ff, #9400d3);
-    background-size: 300% 300%;
-    filter: blur(10px);
-    animation: 
-        fever-pulse 1.5s infinite ease-in-out,
-        rainbow-shift 3s linear infinite;
-}
-/* THIS IS THE FIX: It makes the arrow background transparent during fever */
-.game-grid.combo-fever .arrow-icon .arrow-bg {
-    fill: transparent;
-    transition: fill 0.3s ease;
-}
-/* --- END FEVER --- */
+        DOMElements.titleScreen.classList.add('hidden');
+        DOMElements.connectionSetup.classList.add('visible');
 
+        window.removeEventListener('keydown', proceed);
+        window.removeEventListener('click', proceed);
+    };
 
-.game-grid.attack-launch { animation: attack-launch 0.4s ease-out; }
-@keyframes attack-launch {
-    50% { box-shadow: 0 0 25px var(--primary-color), 0 0 20px var(--primary-color) inset; }
-}
-
-.game-grid.grid-tilting { animation: grid-tilt 0.5s ease-in-out; }
-@keyframes grid-tilt {
-    0%, 100% { transform: rotate(0) translateX(0); }
-    50% { transform: rotate(7deg) translateX(20px); }
+    window.addEventListener('keydown', proceed);
+    window.addEventListener('click', proceed);
 }
 
 
-.timer-bar-container { width: 100%; height: 10px; background: rgba(0, 0, 0, 0.3); border-radius: 5px; overflow: hidden; position: relative; }
-.timer-bar {
-    width: 100%; height: 100%;
-    background: linear-gradient(90deg, var(--success-color), #FFEB3B, var(--danger-color));
-    border-radius: 5px; transition: width 0.1s linear;
-}
+function setupUIListeners() {
+    DOMElements.gameModeToggle.addEventListener('change', handleGameModeChange);
+    DOMElements.startBtn.addEventListener('click', onStartGameClick);
+    DOMElements.joinBtn.addEventListener('click', onJoinGameClick);
+    DOMElements.videoUrlInput.addEventListener('input', () => {
+        gameState.videoUrl = DOMElements.videoUrlInput.value.trim();
+    });
+    DOMElements.chatInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+            sendChatMessage();
+        }
+    });
+    DOMElements.chatSendBtn.addEventListener('click', sendChatMessage);
+    DOMElements.rematchBtn.addEventListener('click', () => {
+        if (gameState.mode === 'multi') sendData({ type: 'rematch' });
+        resetGame();
+    });
+    DOMElements.fullscreenBtn.addEventListener('click', toggleFullScreen);
+    DOMElements.changeVideoBtn.addEventListener('click', () => {
+        const newUrl = DOMElements.nextVideoInput.value.trim();
+        if (newUrl) {
+            gameState.videoUrl = newUrl;
+            DOMElements.videoUrlInput.value = newUrl;
+            setVideoBackground();
+            DOMElements.nextVideoInput.value = '';
+            if (gameState.mode === 'multi' && conn) {
+                sendData({ type: 'video_change', url: newUrl });
+            }
+        }
+    });
 
-.timer-bar-container.decay-active .timer-bar {
-    animation: pulse-red-timer 0.5s infinite;
-}
-@keyframes pulse-red-timer {
-    50% { box-shadow: 0 0 15px var(--danger-color); }
-}
+    // Settings screen listeners
+    DOMElements.settingsBtn.addEventListener('click', () => {
+        updateSettingsUI();
+        DOMElements.settingsScreen.classList.remove('hidden');
+    });
+    DOMElements.closeSettingsBtn.addEventListener('click', () => {
+        loadSettings();
+        DOMElements.settingsScreen.classList.add('hidden');
+    });
+    DOMElements.saveSettingsBtn.addEventListener('click', saveSettings);
+    DOMElements.defaultsSettingsBtn.addEventListener('click', () => {
+        if (confirm('Are you sure you want to load default settings? Any unsaved changes will be lost.')) {
+            currentSettings = JSON.parse(JSON.stringify(defaultSettings));
+            applySettings();
+            updateSettingsUI();
+        }
+    });
 
+    DOMElements.bindUpBtn.addEventListener('click', () => listenForKeybind('ArrowUp', DOMElements.bindUpBtn));
+    DOMElements.bindDownBtn.addEventListener('click', () => listenForKeybind('ArrowDown', DOMElements.bindDownBtn));
+    DOMElements.bindLeftBtn.addEventListener('click', () => listenForKeybind('ArrowLeft', DOMElements.bindLeftBtn));
+    DOMElements.bindRightBtn.addEventListener('click', () => listenForKeybind('ArrowRight', DOMElements.bindRightBtn));
 
-/* --- Combo Counter --- */
-.combo-counter-container {
-    font-family: var(--font-display);
-    text-align: center;
-    opacity: 0;
-    transform: translateY(10px);
-    transition: opacity 0.3s, transform 0.3s;
-}
-.combo-counter-container.visible {
-    opacity: 1;
-    transform: translateY(0);
-}
-.combo-count {
-    font-size: 2.5rem;
-    font-weight: 900;
-    line-height: 1;
-    display: inline-block;
-    color: #FFEB3B;
-    text-shadow: 0 0 8px #FFEB3B;
-}
-.combo-label {
-    font-size: 1rem;
-    font-weight: 700;
-    display: block;
-    color: var(--text-color);
-}
-.combo-count.pop {
-    animation: pop-in 0.2s cubic-bezier(0.68, -0.55, 0.27, 1.55);
-}
-@keyframes pop-in {
-    0% { transform: scale(0.8); }
-    70% { transform: scale(1.2); }
-    100% { transform: scale(1); }
-}
-
-.fever-text {
-    font-family: var(--font-title);
-    font-size: 1.5rem;
-    font-weight: 700;
-    letter-spacing: 3px;
-    height: 1.5rem; /* Reserve space to prevent layout shift */
-    margin-bottom: 0.5rem;
-    background: linear-gradient(90deg, #ff0000, #ff7f00, #ffff00, #00ff00, #0000ff, #4b0082, #9400d3);
-    background-size: 300% 300%;
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    animation: rainbow-shift 2s ease-in-out infinite;
-}
-
-@keyframes rainbow-shift {
-    0%{background-position:0% 50%}
-    50%{background-position:100% 50%}
-    100%{background-position:0% 50%}
-}
+    DOMElements.colorUpInput.addEventListener('input', () => { currentSettings.colors.up = DOMElements.colorUpInput.value; applySettings(); });
+    DOMElements.colorDownInput.addEventListener('input', () => { currentSettings.colors.down = DOMElements.colorDownInput.value; applySettings(); });
+    DOMElements.colorLeftInput.addEventListener('input', () => { currentSettings.colors.left = DOMElements.colorLeftInput.value; applySettings(); });
+    DOMElements.colorRightInput.addEventListener('input', () => { currentSettings.colors.right = DOMElements.colorRightInput.value; applySettings(); });
+    DOMElements.colorGridInput.addEventListener('input', () => { currentSettings.colors.grid = DOMElements.colorGridInput.value; applySettings(); });
 
 
-/* --- Chat UI --- */
-#popup-chat-container {
-    position: absolute;
-    top: 45%; left: 50%;
-    transform: translateX(-50%);
-    width: 80%; max-width: 800px;
-    z-index: 100;
-    display: flex; flex-direction: column-reverse;
-    align-items: center; pointer-events: none;
-}
-#chat-bubbles {
-    display: flex; flex-direction: column;
-    gap: 10px; margin-bottom: 10px;
-}
-.chat-bubble {
-    padding: 1rem 1.5rem; border-radius: 20px;
-    font-size: 1.75rem; font-weight: 700;
-    font-family: var(--font-display);
-    color: white; text-shadow: 0 2px 5px rgba(0,0,0,0.5);
-    max-width: 100%; pointer-events: all;
-    animation: pop-in-out 5s cubic-bezier(0.68, -0.55, 0.27, 1.55) forwards;
-}
-.chat-bubble.mine {
-    background: var(--primary-color);
-    box-shadow: 0 0 15px var(--primary-color);
-    align-self: flex-end;
-}
-.chat-bubble.theirs {
-    background-color: var(--secondary-color);
-    box-shadow: 0 0 15px var(--secondary-color);
-    align-self: flex-start;
-}
-#chat-input-container {
-    position: absolute; bottom: 2rem;
-    width: 100%; max-width: 500px;
-    left: 50%; transform: translateX(-50%);
-    z-index: 201;
-    display: flex;
-    gap: 0.5rem;
-}
-#chat-input {
-    width: 100%; padding: 1rem;
-    border: 1px solid var(--glass-border);
-    background: var(--glass-bg); border-radius: 8px;
-    color: var(--text-color); text-align: center;
-    font-size: 1rem; backdrop-filter: blur(8px);
-    flex-grow: 1;
-}
-#chat-send-btn {
-    padding: 0 1.5rem;
-    flex-shrink: 0;
+    document.addEventListener('fullscreenchange', updateFullscreenIcons);
+    window.addEventListener('keydown', handleKeyPress);
+    handleGameModeChange();
 }
 
-@keyframes pop-in-out {
-    0% { transform: scale(0.5); opacity: 0; }
-    15% { transform: scale(1.1); opacity: 1; }
-    25% { transform: scale(1); opacity: 1; }
-    85% { transform: scale(1); opacity: 1; }
-    100% { transform: scale(0.8); opacity: 0; }
+function handleGameModeChange() {
+    const isMultiplayer = DOMElements.gameModeToggle.checked;
+    if (isMultiplayer) {
+        gameState.mode = 'multi';
+        DOMElements.joinBtn.style.display = 'block';
+        DOMElements.roomNameInput.style.display = 'block';
+        DOMElements.startBtn.textContent = 'Create Game';
+        DOMElements.bossModeContainer.style.display = 'flex';
+    } else {
+        gameState.mode = 'solo';
+        DOMElements.joinBtn.style.display = 'none';
+        DOMElements.roomNameInput.style.display = 'none';
+        DOMElements.startBtn.textContent = 'Start Game';
+        DOMElements.bossModeContainer.style.display = 'flex';
+    }
 }
 
-/* --- Game Over Screen --- */
-#game-over-screen {
-    position: fixed;
-    top: 0; left: 0; width: 100%; height: 100%;
-    background: linear-gradient(to bottom, rgba(18, 18, 18, 0.9) 0%, rgba(18, 18, 18, 0) 70%);
-    z-index: 200;
-    display: flex;
-    align-items: flex-start;
-    justify-content: center;
-    padding-top: 10vh;
-    opacity: 0;
-    transition: opacity 0.5s ease;
-    pointer-events: none;
+function onStartGameClick() {
+    gameState.isHost = true;
+    gameState.bossMode = DOMElements.bossModeToggle.checked;
+    const playerName = DOMElements.playerNameInput.value || 'Player 1';
+    
+    if (gameState.mode === 'solo') {
+        localPlayer = new Player(1, playerName, true);
+        const playerData = loadPlayerData();
+        localPlayer.updateLevel(playerData.highestWave);
+        localPlayer.dom.playerArea.classList.add('is-local-player');
+        localPlayer.dom.grid.addEventListener('touchstart', handleTouchStart, false);
+        localPlayer.dom.grid.addEventListener('touchmove', handleTouchMove, false);
+        localPlayer.dom.grid.addEventListener('touchend', handleTouchEnd, false);
+        
+        DOMElements.player2Container.style.display = 'none';
+        
+        transitionToGameArea();
+        setVideoBackground();
+        
+        if (gameState.bossMode) {
+            startWave(1);
+        } else {
+            localPlayer.startNewSequence();
+        }
+
+    } else { // Multiplayer
+        const roomName = DOMElements.roomNameInput.value;
+        if (!roomName) return alert('Please enter a room name.');
+        
+        localPlayer = new Player(1, playerName, true);
+        const playerData = loadPlayerData();
+        localPlayer.updateLevel(playerData.highestWave);
+        localPlayer.dom.playerArea.classList.add('is-local-player');
+        localPlayer.dom.grid.addEventListener('touchstart', handleTouchStart, false);
+        localPlayer.dom.grid.addEventListener('touchmove', handleTouchMove, false);
+        localPlayer.dom.grid.addEventListener('touchend', handleTouchEnd, false);
+        
+        peer = new Peer(roomName);
+        peer.on('open', id => {
+            transitionToGameArea();
+            DOMElements.lobbyOverlay.classList.remove('hidden');
+            DOMElements.lobbyText.textContent = `Waiting for opponent...\nRoom: ${id}`;
+        });
+        peer.on('connection', newConn => { conn = newConn; setupConnection(); });
+        peer.on('error', err => alert('PeerJS Error: ' + err.type));
+    }
 }
-#game-over-screen.visible {
-    opacity: 1;
-    pointer-events: all;
+
+function onJoinGameClick() {
+    gameState.isHost = false;
+    const playerName = DOMElements.playerNameInput.value || 'Player 2';
+    const roomName = DOMElements.roomNameInput.value;
+    if (!roomName) return alert('Please enter a room name to join.');
+
+    localPlayer = new Player(2, playerName, true);
+    const playerData = loadPlayerData();
+    localPlayer.updateLevel(playerData.highestWave);
+    localPlayer.dom.playerArea.classList.add('is-local-player');
+    localPlayer.dom.grid.addEventListener('touchstart', handleTouchStart, false);
+    localPlayer.dom.grid.addEventListener('touchmove', handleTouchMove, false);
+    localPlayer.dom.grid.addEventListener('touchend', handleTouchEnd, false);
+
+    peer = new Peer();
+    peer.on('open', () => {
+        conn = peer.connect(roomName); 
+        setupConnection();
+        transitionToGameArea();
+        DOMElements.lobbyOverlay.classList.remove('hidden');
+        DOMElements.lobbyText.textContent = 'Connecting...';
+    });
+    peer.on('error', err => alert('PeerJS Error: ' + err.type));
 }
-#game-over-content {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 1.5rem;
-    text-align: center;
+
+function setupConnection() {
+    conn.on('open', () => {
+        if (!gameState.isHost) {
+            DOMElements.lobbyText.textContent = 'Connected! Waiting for host...';
+            sendData({ type: 'player_join', name: localPlayer.name, level: localPlayer.level });
+        }
+    });
+
+    conn.on('data', data => {
+        switch (data.type) {
+            case 'player_join':
+                if (gameState.isHost) {
+                    remotePlayer = new Player(2, data.name, false);
+                    remotePlayer.updateLevel(data.level);
+                    remotePlayer.dom.playerArea.classList.add('is-remote-player');
+                    sendData({
+                        type: 'initial_state',
+                        hostName: localPlayer.name,
+                        level: localPlayer.level,
+                        videoUrl: gameState.videoUrl,
+                        bossMode: gameState.bossMode,
+                    });
+                    
+                    startCountdown();
+                    sendData({ type: 'start_countdown' });
+                }
+                break;
+            case 'start_countdown':
+                if (!gameState.isHost) startCountdown();
+                break;
+            case 'video_change':
+                gameState.videoUrl = data.url;
+                DOMElements.videoUrlInput.value = data.url;
+                DOMElements.nextVideoInput.value = data.url;
+                setVideoBackground();
+                break;
+            case 'initial_state':
+                remotePlayer = new Player(1, data.hostName, false);
+                remotePlayer.updateLevel(data.level);
+                remotePlayer.dom.playerArea.classList.add('is-remote-player');
+                gameState.videoUrl = data.videoUrl;
+                gameState.bossMode = data.bossMode;
+                break;
+            case 'new_sequence':
+                if (remotePlayer) {
+                    remotePlayer.startNewSequence(data.sequence);
+                    remotePlayer.updateCombo(data.combo);
+                }
+                break;
+            case 'key_press_update':
+                if (remotePlayer) handleRemoteKeyPress(data.progress);
+                break;
+            case 'failure_update':
+                 if (remotePlayer) remotePlayer.updateLives(data.lives);
+                break;
+            case 'game_over':
+                gameOver(data.winnerName);
+                break;
+            case 'rematch':
+                resetGame();
+                break;
+            case 'chat':
+                addChatMessage(data.message, 'theirs');
+                break;
+            case 'damage_boss':
+                if (gameState.isHost && remotePlayer) {
+                    const damage = data.damageType === 'heavy' ? 25 : 5;
+                    dealDamageToBoss(damage, remotePlayer, data.damageType === 'heavy');
+                }
+                break;
+            case 'boss_health_update':
+                if (!gameState.isHost) {
+                    updateBossHealth(data.health);
+                }
+                break;
+            case 'wave_change':
+                if (!gameState.isHost) {
+                    startWave(data.wave);
+                }
+                break;
+            case 'level_update':
+                if (remotePlayer) {
+                    remotePlayer.updateLevel(data.level);
+                }
+                break;
+            case 'boss_attack':
+                if (!gameState.isHost) {
+                    applyBossAttack(data.attackType, localPlayer);
+                }
+                break;
+            case 'player_state_update':
+                if (remotePlayer) {
+                    remotePlayer.isIdle = data.isIdle;
+                    if (gameState.isHost && remotePlayer.isIdle && gameState.pendingNextWave) {
+                        gameState.pendingNextWave = false;
+                        startWave(gameState.currentWave + 1);
+                    }
+                }
+                break;
+        }
+    });
 }
-#game-over-title {
-    font-family: var(--font-title);
-    font-size: 5rem;
-    line-height: 1;
-    text-transform: uppercase;
-    color: var(--danger-color);
-    text-shadow: 0 0 15px var(--danger-color);
-    margin-bottom: 0;
+
+// --- Announcement and Wave Logic ---
+function showAnnouncement(element, text, duration) {
+    element.textContent = text;
+    element.classList.remove('hidden');
+    return new Promise(resolve => {
+        setTimeout(() => {
+            element.classList.add('hidden');
+            setTimeout(resolve, 300);
+        }, duration);
+    });
 }
-#game-over-title .char {
-    display: inline-block;
-    opacity: 0;
-    transform: translateY(-100px);
-    animation-fill-mode: forwards;
+
+async function startWave(waveNumber) {
+    const completedWave = waveNumber - 1;
+    if (completedWave > 0 && localPlayer.isLocal) {
+        const playerData = loadPlayerData();
+        if (completedWave > playerData.highestWave) {
+            playerData.highestWave = completedWave;
+            savePlayerData(playerData);
+            localPlayer.updateLevel(playerData.highestWave);
+            triggerLevelUpEffect();
+            if (gameState.mode === 'multi' && conn) {
+                sendData({ type: 'level_update', level: localPlayer.level });
+            }
+        }
+    }
+
+    gameState.currentWave = waveNumber;
+    gameState.isCrescendoWave = gameState.currentWave % 3 === 0;
+    DOMElements.bossArea.classList.remove('crescendo-intro');
+
+    if (gameState.isCrescendoWave) {
+        await showAnnouncement(DOMElements.warningEncounter, 'WARNING!!!', 2500);
+        initBoss(true);
+    } else {
+        if (waveNumber > 1) {
+             await showAnnouncement(DOMElements.waveAnnouncement, `WAVE ${gameState.currentWave}`, 2000);
+        }
+        initBoss(false);
+    }
+    
+    localPlayer.startNewSequence();
+
+    if (gameState.isHost && gameState.mode === 'multi' && conn) {
+        sendData({ type: 'wave_change', wave: waveNumber });
+    }
+    
+    gameState.isTransitioning = false;
 }
-#game-over-screen.visible .char {
-    animation: fall-in 0.6s cubic-bezier(0.76, 0, 0.24, 1);
+
+function rewardPlayer() {
+    if (localPlayer.lives < 3) {
+        localPlayer.lives++;
+        localPlayer.updateLives(localPlayer.lives);
+        return true;
+    }
+    return false;
 }
-#winner-name-display {
-    font-family: var(--font-display);
-    font-size: 2rem;
-    opacity: 0;
-    animation-fill-mode: forwards;
-    margin-bottom: 1rem;
+
+function startCountdown() {
+    DOMElements.lobbyOverlay.classList.remove('hidden');
+    let count = 3;
+    const updateText = (text) => {
+        DOMElements.lobbyText.textContent = text;
+        DOMElements.lobbyText.classList.remove('countdown-pop');
+        void DOMElements.lobbyText.offsetWidth;
+        DOMElements.lobbyText.classList.add('countdown-pop');
+    };
+
+    updateText(count);
+    const interval = setInterval(() => {
+        count--;
+        if (count > 0) {
+            updateText(count);
+        } else {
+            clearInterval(interval);
+            updateText('START!');
+            setTimeout(() => {
+                DOMElements.lobbyOverlay.classList.add('hidden');
+                setVideoBackground();
+                
+                if (gameState.bossMode) {
+                    if (gameState.isHost) {
+                        startWave(1);
+                    }
+                } else {
+                    localPlayer.startNewSequence();
+                }
+            }, 1000);
+        }
+    }, 1000);
 }
-#game-over-screen.visible #winner-name-display {
-    opacity: 1;
-    animation: glimmer 2.5s infinite;
-    animation-delay: 1s;
+
+// --- Boss Functions ---
+function initBoss(isCrescendo) {
+    DOMElements.bossArea.style.display = 'block';
+    DOMElements.bossArea.classList.remove('enraged', 'boss-active', 'crescendo-intro');
+    gameState.bossIsEnraged = false;
+    gameState.sequenceTurnCounter = 0;
+
+    if (isCrescendo) {
+        DOMElements.bossSymbol.textContent = '💀';
+        DOMElements.bossSymbol.classList.remove('hidden');
+        DOMElements.bossArea.classList.add('boss-active', 'crescendo-intro');
+    } else {
+        DOMElements.bossSymbol.classList.add('hidden');
+    }
+
+    const bossLevel = gameState.currentWave;
+    const bossNameList = isCrescendo ? MENACING_BOSS_NAMES : BOSS_NAMES;
+    
+    gameState.bossName = bossNameList[Math.floor(Math.random() * bossNameList.length)];
+    gameState.bossLevel = bossLevel;
+    gameState.bossElement = BOSS_ELEMENTS[Math.floor(Math.random() * BOSS_ELEMENTS.length)];
+    
+    const baseHealth = isCrescendo ? 300 : 150;
+    gameState.bossMaxHealth = baseHealth + (bossLevel * 25);
+    gameState.bossCurrentHealth = gameState.bossMaxHealth;
+    
+    DOMElements.bossName.textContent = gameState.bossName;
+    DOMElements.bossLevel.textContent = `Lvl ${gameState.bossLevel}`;
+    DOMElements.bossArea.classList.add(gameState.bossElement);
+
+    updateBossHealth(gameState.bossCurrentHealth);
 }
-#game-over-content .btn {
-    opacity: 0;
-    animation-fill-mode: forwards;
+
+function hostCheckBossTrigger() {
+    if (gameState.status !== 'playing' || !gameState.bossMode || gameState.isTransitioning) return;
+    
+    gameState.sequenceTurnCounter++;
+    const triggerInterval = gameState.bossIsEnraged ? 2 : 3;
+    if(gameState.sequenceTurnCounter > 0 && gameState.sequenceTurnCounter % triggerInterval === 0) {
+        triggerBossAction();
+    }
 }
-#game-over-screen.visible #game-over-content .btn {
-    pointer-events: all;
+
+function triggerBossAction() {
+    let availableActions = ["timer_burn", "blur", "stealth", "heal", "seismic_shift", "rhythm_shift"];
+    if (gameState.currentWave >= 4) {
+        availableActions.push('stagger');
+        if (gameState.isCrescendoWave) {
+            availableActions.push('blur_stealth');
+        }
+    }
+    if (gameState.bossCurrentHealth === gameState.bossMaxHealth) {
+        availableActions = availableActions.filter(action => action !== 'heal');
+    }
+
+    const action = availableActions[Math.floor(Math.random() * availableActions.length)];
+    
+    if (action === 'heal') {
+        DOMElements.bossArea.classList.add('boss-healing');
+        setTimeout(() => DOMElements.bossArea.classList.remove('boss-healing'), 1000);
+        const newHealth = Math.min(gameState.bossMaxHealth, gameState.bossCurrentHealth + 10);
+        updateBossHealth(newHealth);
+    } else {
+        let target = localPlayer;
+        if (remotePlayer && Math.random() < 0.5) {
+            target = remotePlayer;
+        }
+
+        DOMElements.bossArea.classList.add('boss-acting');
+        setTimeout(() => DOMElements.bossArea.classList.remove('boss-acting'), 1000);
+        
+        if (target.isLocal) {
+            applyBossAttack(action, target);
+        } else {
+            sendData({ type: 'boss_attack', attackType: action });
+        }
+    }
 }
-#game-over-screen.visible .btn {
-    animation: fade-in 1s ease forwards;
-    animation-delay: 1.2s;
+
+function showAttackAnnouncement(attackType, player, isDramatic = false) {
+    if (!player || !player.dom || !player.dom.attackAnnouncement) return;
+    const attackName = ATTACK_NAMES[attackType];
+    if (!attackName) return;
+    const container = player.dom.attackAnnouncement;
+
+    if (isDramatic) { container.classList.add('dramatic'); }
+
+    container.innerHTML = '';
+    attackName.split('').forEach((char, index) => {
+        const span = document.createElement('span');
+        span.className = 'char';
+        span.textContent = char === ' ' ? '\u00A0' : char;
+        span.style.animationDelay = `${index * 0.05}s`;
+        container.appendChild(span);
+    });
+    container.classList.add('visible');
+    setTimeout(() => {
+        container.classList.remove('visible');
+        if (isDramatic) { container.classList.remove('dramatic'); }
+    }, 2500);
 }
-#post-game-stats {
-    display: flex;
-    gap: 2rem;
-    margin-bottom: 1rem;
-    background: rgba(0,0,0,0.2);
-    padding: 1rem 2rem;
-    border-radius: 12px;
+
+function applyBossAttack(attackType, player) {
+    if (!player) return;
+    
+    showAttackAnnouncement(attackType, player, attackType === 'rhythm_shift');
+    player.dom.playerArea.classList.add('shake');
+    setTimeout(() => player.dom.playerArea.classList.remove('shake'), 500);
+
+    switch(attackType) {
+        case 'timer_burn':
+            const burnAmount = gameState.bossIsEnraged ? 45 : 30;
+            const currentWidth = parseFloat(player.dom.timerBar.style.width) || 100;
+            player.dom.timerBar.style.width = `${Math.max(0, currentWidth - burnAmount)}%`;
+            const effectEl = player.dom[`timerEffect${gameState.bossElement.charAt(0).toUpperCase() + gameState.bossElement.slice(1)}`];
+            if(effectEl) {
+                effectEl.classList.add('visible');
+                setTimeout(() => effectEl.classList.remove('visible'), 1000);
+            }
+            break;
+        case 'blur':
+            player.dom.grid.classList.add('blurred');
+            setTimeout(() => player.dom.grid.classList.remove('blurred'), 3000);
+            break;
+        case 'stealth':
+            player.dom.sequenceContainer.classList.add('stealth');
+            break;
+        case 'seismic_shift':
+            player.dom.grid.classList.add('grid-tilting');
+            setTimeout(() => player.dom.grid.classList.remove('grid-tilting'), 3000);
+            break;
+        case 'rhythm_shift':
+            player.decayActive = true;
+            return;
+        case 'stagger':
+            displaySequenceStaggered(player);
+            break;
+        case 'blur_stealth':
+            player.dom.grid.classList.add('blurred');
+            setTimeout(() => {
+                player.dom.sequenceContainer.classList.add('stealth');
+            }, 1000);
+            break;
+    }
 }
-.stat-item {
-    text-align: center;
-    min-width: 120px;
-}
-.stat-label {
-    font-size: 0.9rem;
-    color: #aaa;
-    display: block;
-    text-transform: uppercase;
-}
-.stat-value {
-    font-size: 2rem;
-    font-family: var(--font-display);
-    line-height: 1.2;
-}
-#next-video-section {
-    display: flex;
-    gap: 0.5rem;
-    width: 100%;
-    max-width: 450px;
-    align-items: center;
-}
-#next-video-input {
-    flex-grow: 1;
-    padding: 0.75rem;
-    background: rgba(0, 0, 0, 0.3);
-    border: 1px solid var(--glass-border);
-    border-radius: 8px;
-    color: var(--text-color);
-    font-size: 0.9rem;
-    text-align: center;
-}
-#change-video-btn {
-    padding: 0.75rem 1rem;
-    font-size: 0.9rem;
+
+function displaySequenceStaggered(player) {
+    const container = player.dom.sequenceContainer;
+    container.innerHTML = ''; 
+    const sequence = player.currentSequence;
+    const revealDelay = 300;
+
+    sequence.forEach((arrowKey, index) => {
+        setTimeout(() => {
+            container.innerHTML += ARROW_SVG[arrowKey];
+        }, index * revealDelay);
+    });
+
+    setTimeout(() => {
+        container.classList.add('stealth');
+    }, sequence.length * revealDelay + 500);
 }
 
 
-@keyframes fall-in {
-    to { opacity: 1; transform: translateY(0); }
-}
-@keyframes glimmer {
-    0% { color: white; text-shadow: 0 0 10px rgba(255, 255, 255, 0.7); }
-    50% { color: #FFEB3B; text-shadow: 0 0 20px #FFEB3B, 0 0 30px #FFC107; }
-    100% { color: white; text-shadow: 0 0 10px rgba(255, 255, 255, 0.7); }
-}
-@keyframes fade-in {
-    to { opacity: 1; }
+function playDeathAnimation(isCrescendo) {
+    return new Promise(resolve => {
+        const duration = isCrescendo ? 1500 : 1000;
+        const container = DOMElements.bossHealthBarContainer;
+        const mainBar = DOMElements.bossHealthBar;
+        const shards = container.querySelectorAll('.health-bar-shard');
+
+        const mainBarStyle = getComputedStyle(mainBar).background;
+        shards.forEach(shard => {
+            shard.style.background = mainBarStyle;
+        });
+
+        container.classList.add(isCrescendo ? 'crescendo-defeated' : 'defeated');
+
+        setTimeout(() => {
+            container.classList.remove('crescendo-defeated', 'defeated');
+            shards.forEach(shard => shard.style.background = ''); 
+            resolve();
+        }, duration);
+    });
 }
 
-/* --- Boss Area --- */
-#boss-area {
-    width: 100%;
-    max-width: 800px;
-    margin-bottom: 2rem;
-    text-align: center;
-    font-family: var(--font-display);
-    transition: transform 0.2s, filter 0.5s;
-    position: relative;
-}
-#boss-area.crescendo-intro {
-    animation: crescendo-intro-anim 1s cubic-bezier(0.68, -0.55, 0.27, 1.55) forwards;
-}
-#boss-area.boss-acting { animation: boss-lunge-attack 1s; }
-#boss-area.boss-healing { animation: boss-lunge-heal 1s; }
-#boss-area.enraged {
-    animation: pulse-enraged 1.2s infinite ease-in-out;
-}
-@keyframes crescendo-intro-anim {
-    0% { transform: translateY(-150%); opacity: 0; }
-    70% { transform: translateY(10%); opacity: 1; }
-    100% { transform: translateY(0); opacity: 1; }
-}
-@keyframes pulse-enraged {
-    50% { filter: drop-shadow(0 0 25px var(--danger-color)); transform: scale(1.02); box-shadow: inset 0 0 20px rgba(244, 67, 54, 0.5); }
+async function dealDamageToBoss(damage, player, isHeavyAttack = false) {
+    if (gameState.status !== 'playing' || gameState.isTransitioning) return;
+
+    player.damageDealt += damage;
+    player.dom.grid.classList.add('attack-launch');
+    setTimeout(() => player.dom.grid.classList.remove('attack-launch'), 400);
+
+    const newHealth = Math.max(0, gameState.bossCurrentHealth - damage);
+    updateBossHealth(newHealth, isHeavyAttack);
+
+    if (newHealth <= 0) {
+        gameState.isTransitioning = true; 
+        await playDeathAnimation(gameState.isCrescendoWave);
+        
+        if (remotePlayer && !remotePlayer.isIdle) {
+            gameState.pendingNextWave = true;
+            return;
+        }
+
+        if (gameState.isCrescendoWave) {
+            if (rewardPlayer()) {
+                await showAnnouncement(DOMElements.rewardAnnouncement, '+1 LIFE', 1500);
+            }
+        }
+        startWave(gameState.currentWave + 1);
+    } else if (player.isLocal) {
+        player.startNewSequence();
+    }
 }
 
-#boss-info {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 0 0.5rem;
-    margin-bottom: 0.5rem;
-}
-#boss-symbol {
-    font-size: 1.5rem;
-    margin-right: 0.5rem;
-    color: var(--danger-color);
-    text-shadow: 0 0 10px var(--danger-color);
-}
-#boss-name {
-    font-size: 2rem;
-    font-weight: 700;
-}
-#boss-area.fire #boss-name { color: #ff8c00; text-shadow: 0 0 10px #ff4800; }
-#boss-area.poison #boss-name { color: #76ff03; text-shadow: 0 0 10px #76ff03; }
-#boss-area.ice #boss-name { color: #40c4ff; text-shadow: 0 0 10px #40c4ff; }
-#boss-level {
-    font-size: 1rem;
-    font-weight: 700;
-    color: #ccc;
-}
-#boss-health-bar-container {
-    width: 100%;
-    height: 30px;
-    background: rgba(0,0,0,0.5);
-    border: 2px solid var(--glass-border);
-    border-radius: 15px;
-    padding: 4px;
-    position: relative;
-    overflow: hidden;
-    transition: transform 0.3s ease-out, height 0.3s ease-out;
-}
-#boss-area.boss-active #boss-health-bar-container {
-    transform: scale(1.1);
-    height: 40px;
-}
-#boss-health-bar {
-    width: 100%;
-    height: 100%;
-    background: linear-gradient(90deg, var(--danger-color), var(--secondary-color));
-    border-radius: 10px;
-    transition: width 0.5s ease-out, background 0.3s ease-out;
-}
-#boss-area.boss-active #boss-health-bar {
-    background: linear-gradient(90deg, #FFC107, #F44336);
+function updateBossHealth(health, isHeavy = false) {
+    gameState.bossCurrentHealth = health;
+    const healthPercent = (gameState.bossCurrentHealth / gameState.bossMaxHealth) * 100;
+    DOMElements.bossHealthBar.style.width = `${healthPercent}%`;
+
+    if (healthPercent <= 25 && !gameState.bossIsEnraged) {
+        gameState.bossIsEnraged = true;
+        DOMElements.bossArea.classList.add('enraged');
+    }
+
+    if (isHeavy) {
+        DOMElements.bossHealthBarContainer.classList.add('heavy-shake');
+        const crack = document.createElement('div');
+        crack.className = 'health-crack-effect';
+        DOMElements.bossHealthBarContainer.appendChild(crack);
+        setTimeout(() => {
+            DOMElements.bossHealthBarContainer.classList.remove('heavy-shake');
+            crack.remove();
+        }, 500);
+    } else {
+        DOMElements.bossHealthBarContainer.classList.add('jiggle');
+        setTimeout(() => DOMElements.bossHealthBarContainer.classList.remove('jiggle'), 300);
+    }
+
+    if (gameState.isHost && gameState.mode === 'multi' && conn) {
+        sendData({ type: 'boss_health_update', health: gameState.bossCurrentHealth });
+    }
 }
 
-/* Health Bar Defeat Animations */
-.health-bar-shard {
-    position: absolute;
-    top: 0; bottom: 0;
-    opacity: 0;
-    border-radius: 10px;
-}
-#boss-health-bar-container.defeated #boss-health-bar,
-#boss-health-bar-container.crescendo-defeated #boss-health-bar {
-    opacity: 0;
-}
-/* Echo Defeat */
-#boss-health-bar-container.defeated #shard1 {
-    left: 0; right: 50%;
-    opacity: 1;
-    animation: break-and-fall-left 1s forwards;
-}
-#boss-health-bar-container.defeated #shard2 {
-    left: 50%; right: 0;
-    opacity: 1;
-    animation: break-and-fall-right 1s forwards;
-}
-@keyframes break-and-fall-left {
-    to { transform: rotate(-10deg) translate(-50px, 100px); opacity: 0; }
-}
-@keyframes break-and-fall-right {
-    to { transform: rotate(10deg) translate(50px, 100px); opacity: 0; }
-}
-/* Crescendo Defeat */
-#boss-health-bar-container.crescendo-defeated .health-bar-shard {
-    opacity: 1;
-    animation-duration: 1.5s;
-    animation-fill-mode: forwards;
-}
-#boss-health-bar-container.crescendo-defeated #shard1 { left: 0; width: 20%; animation-name: crescendo-shatter1; }
-#boss-health-bar-container.crescendo-defeated #shard2 { left: 20%; width: 20%; animation-name: crescendo-shatter2; }
-#boss-health-bar-container.crescendo-defeated #shard3 { left: 40%; width: 20%; animation-name: crescendo-shatter3; }
-#boss-health-bar-container.crescendo-defeated #shard4 { left: 60%; width: 20%; animation-name: crescendo-shatter4; }
-#boss-health-bar-container.crescendo-defeated #shard5 { left: 80%; width: 20%; animation-name: crescendo-shatter5; }
-
-@keyframes crescendo-shatter1 { to { transform: translate(-150px, 100px) rotate(-35deg); opacity: 0; } }
-@keyframes crescendo-shatter2 { to { transform: translate(-50px, 200px) rotate(-15deg); opacity: 0; } }
-@keyframes crescendo-shatter3 { to { transform: translate(0, 250px) rotate(0deg); opacity: 0; } }
-@keyframes crescendo-shatter4 { to { transform: translate(50px, 200px) rotate(15deg); opacity: 0; } }
-@keyframes crescendo-shatter5 { to { transform: translate(150px, 100px) rotate(35deg); opacity: 0; } }
-
-
-
-@keyframes boss-lunge-attack { 
-    25% { transform: translateY(-10px) scale(1.03); filter: drop-shadow(0 0 15px var(--danger-color)); }
-    50% { transform: translateY(0) scale(1); }
-    75% { transform: translateY(-10px) scale(1.03); filter: drop-shadow(0 0 15px var(--danger-color)); }
-}
-@keyframes boss-lunge-heal { 
-    25% { transform: translateY(-10px) scale(1.03); filter: drop-shadow(0 0 15px var(--success-color)); }
-    50% { transform: translateY(0) scale(1); }
-    75% { transform: translateY(-10px) scale(1.03); filter: drop-shadow(0 0 15px var(--success-color)); }
+// --- Core Game Logic ---
+function sendData(data) { if (conn && conn.open) { conn.send(data); } }
+function transitionToGameArea() {
+    DOMElements.connectionSetup.style.display = 'none';
+    DOMElements.gameArea.style.display = 'flex';
+    if (gameState.mode === 'multi') {
+        DOMElements.chatInputContainer.style.display = 'flex';
+    }
 }
 
-#boss-health-bar-container.jiggle { animation: jiggle 0.3s; }
-@keyframes jiggle {
-  0%, 100% { transform: translateX(0); }
-  25% { transform: translateX(-3px); }
-  50% { transform: translateX(3px); }
-  75% { transform: translateX(-3px); }
-}
-#boss-health-bar-container.heavy-shake { animation: heavy-shake 0.5s; }
-@keyframes heavy-shake {
-  0%, 100% { transform: translate(0, 0) rotate(0); }
-  10%, 90% { transform: translate(-8px, 0) rotate(-2deg); }
-  20%, 80% { transform: translate(8px, -4px) rotate(2deg); }
-  30%, 50%, 70% { transform: translate(-8px, 4px) rotate(-1deg); }
-  40%, 60% { transform: translate(8px, 0) rotate(1deg); }
-}
-.health-crack-effect {
-    position: absolute;
-    top: 0; right: 0; bottom: 0; left: 0;
-    background: linear-gradient(115deg, transparent 48%, rgba(255,255,255,0.7) 50%, transparent 52%);
-    animation: crack-fade 0.4s;
-    opacity: 0;
-}
-@keyframes crack-fade { 50% { opacity: 1; } }
+function handleKeyPress(e) {
+    if (gameState.status === 'gameover' || titleScreenActive) return;
 
+    const pressedKey = e.key;
+    const action = Object.keys(currentSettings.keyBinds).find(act => currentSettings.keyBinds[act] === pressedKey);
 
-/* --- Boss Attack Effects --- */
-.attack-announcement {
-    position: absolute; top: 25%; left: 50%; transform: translateX(-50%);
-    z-index: 50;
-    font-family: var(--font-title);
-    font-size: 2.5rem;
-    color: var(--danger-color);
-    text-shadow: 0 0 10px var(--danger-color);
-    opacity: 0;
-    pointer-events: none;
-}
-.attack-announcement.dramatic { font-size: 5rem; color: var(--danger-color); text-shadow: 0 0 20px var(--danger-color); }
-.attack-announcement.visible { opacity: 1; }
-.attack-announcement .char {
-    display: inline-block;
-    opacity: 0;
-    transform: translateY(-50px);
-    animation-fill-mode: forwards;
-}
-.attack-announcement.visible .char {
-     animation-name: fall-in, fade-out-announcement;
-     animation-duration: 0.6s, 1s;
-     animation-delay: 0s, 1.5s;
-     animation-fill-mode: forwards;
-}
-@keyframes fade-out-announcement { to { opacity: 0; transform: translateY(50px); } }
+    if (!action) return;
+    
+    if (gameState.status === 'setup') gameState.status = 'playing';
 
-.game-grid.blurred { filter: blur(12px); }
-.sequence-container.stealth .arrow-icon { animation: fade-out-stealth 3s forwards 1s; }
-@keyframes fade-out-stealth { to { opacity: 0; } }
-@keyframes screen-shake {
-    10%, 90% { transform: translate3d(-1px, 0, 0); }
-    20%, 80% { transform: translate3d(2px, 0, 0); }
-    30%, 50%, 70% { transform: translate3d(-4px, 0, 0); }
-    40%, 60% { transform: translate3d(4px, 0, 0); }
+    if(e.preventDefault) e.preventDefault();
+    const player = localPlayer;
+    if (!player || !player.currentSequence || player.currentSequence.length === 0) return;
+
+    if (action === player.currentSequence[player.sequenceProgress]) {
+        handleCorrectKeyPress(player);
+    } else {
+        handleFailure(player);
+    }
 }
-.player-area.shake { animation: screen-shake 0.5s cubic-bezier(.36,.07,.19,.97) both; }
 
+function handleCorrectKeyPress(player) {
+    const arrowEl = player.dom.sequenceContainer.children[player.sequenceProgress];
+    if (arrowEl) arrowEl.classList.add('correct');
+    player.sequenceProgress++;
 
-.timer-effect {
-    position: absolute; top: 0; left: 0;
-    width: 100%; height: 100%;
-    border-radius: 5px;
-    opacity: 0;
-    pointer-events: none;
+    if (gameState.mode === 'multi') {
+        sendData({ type: 'key_press_update', progress: player.sequenceProgress });
+    }
+
+    if (player.sequenceProgress === player.currentSequence.length) {
+        player.successfulSequences++;
+        player.updateCombo(player.combo + 1);
+        player.dom.grid.classList.add('success-glow');
+        setTimeout(() => player.dom.grid.classList.remove('success-glow'), 500);
+        
+        if (player.hyperspeedActive) {
+            player.timeBonus += 500;
+        }
+        
+        player.isIdle = true;
+        if(player.isLocal && gameState.mode === 'multi' && conn) {
+            sendData({ type: 'player_state_update', isIdle: player.isIdle });
+        }
+
+        if (gameState.bossMode) {
+            cancelAnimationFrame(player.timerId);
+            const damageType = (player.combo > 0 && player.combo % 10 === 0) ? 'heavy' : 'regular';
+            if (gameState.isHost) {
+                dealDamageToBoss(damageType === 'heavy' ? 25 : 5, player, damageType === 'heavy');
+            } else {
+                sendData({ type: 'damage_boss', damageType: damageType });
+                if (!gameState.pendingNextWave) {
+                    player.startNewSequence();
+                }
+            }
+        } else {
+            setTimeout(() => player.startNewSequence(), 300);
+        }
+        
+        if (gameState.isHost) {
+            hostCheckBossTrigger();
+        }
+    }
 }
-.timer-effect.visible { animation: effect-fade-out 0.5s 0.5s forwards; opacity: 1; }
-.timer-fire-effect { background: linear-gradient(to top, #ff4800, transparent); animation-name: flicker; animation-duration: 0.1s; animation-iteration-count: 5; }
-.timer-poison-effect { background: radial-gradient(circle, #76ff03 10%, transparent 70%); animation-name: bubble; animation-duration: 0.5s; animation-iteration-count: 1; }
-.timer-ice-effect { box-shadow: inset 0 0 10px #40c4ff; border: 1px solid #40c4ff; animation-name: ice-crack; animation-duration: 0.5s; animation-iteration-count: 1;}
 
-@keyframes effect-fade-out { to { opacity: 0; } }
-@keyframes flicker { 50% { opacity: 0.7; transform: scaleX(1.05); } }
-@keyframes bubble { 0% { transform: scale(0); } 100% { transform: scale(1.5); } }
-@keyframes ice-crack { 50% { backdrop-filter: blur(2px); } }
+function handleFailure(player) {
+    player.lives--;
+    player.updateLives(player.lives);
+    player.updateCombo(0);
+    
+    player.isIdle = true;
+    if(player.isLocal && gameState.mode === 'multi' && conn) {
+        sendData({ type: 'player_state_update', isIdle: player.isIdle });
+    }
 
-/* --- Mobile Responsive Styles --- */
-@media (max-width: 768px) {
-    #game-container { flex-direction: column; justify-content: flex-start; gap: 1rem; padding-top: 1rem; }
-    #boss-area { margin-bottom: 0.5rem; width: 100%; }
-    #boss-name { font-size: 1.5rem; }
-    #boss-symbol { font-size: 1.2rem; }
-    #connection-setup h1 { font-size: 2.5rem; }
-    .attack-announcement.dramatic { font-size: 3.5rem; }
-    .game-grid.blurred { filter: blur(5px); }
-    .game-grid { display: flex; align-items: center; justify-content: center; }
-    .sequence-container { position: relative; top: auto; left: auto; transform: none; max-width: 100%; justify-content: center; }
-    .player-area.is-remote-player { order: 2; flex: 0; padding: 0.5rem; border: 1px solid var(--glass-border); border-radius: 12px; background: rgba(0,0,0,0.2); }
-    .player-area.is-local-player { order: 1; }
-    .is-remote-player .game-grid, .is-remote-player .timer-bar-container, .is-remote-player .combo-counter-container, .is-remote-player .attack-announcement { display: none; }
-    .is-remote-player .player-header { padding: 0;}
-    .is-remote-player .player-name { font-size: 1.2rem; }
-    .is-remote-player .life-heart { width: 20px; height: 20px; }
-    #chat-input-container { bottom: 1rem; }
-    #game-over-screen { padding-top: 5vh; }
-    #game-over-title { font-size: 3.5rem; }
-    #winner-name-display { font-size: 1.5rem; }
-    #post-game-stats { gap: 1rem; padding: 0.75rem 1rem; }
-    .stat-value { font-size: 1.5rem; }
+    player.dom.grid.classList.add('fail-flash');
+    setTimeout(() => player.dom.grid.classList.remove('fail-flash'), 300);
+
+    if (gameState.mode === 'multi') {
+        sendData({ type: 'failure_update', lives: player.lives });
+    }
+
+    if (player.lives <= 0) {
+        let winnerName = gameState.mode === 'multi' ? (remotePlayer ? remotePlayer.name : 'Opponent') : null;
+        if (gameState.bossMode) {
+            winnerName = `Survived to Wave ${gameState.currentWave}`;
+        }
+        gameOver(winnerName);
+        if(gameState.mode === 'multi') sendData({ type: 'game_over', winnerName: remotePlayer.name });
+
+    } else {
+        setTimeout(() => {
+            if (!gameState.pendingNextWave) {
+                player.startNewSequence();
+            }
+        }, 300);
+    }
 }
+
+function handleRemoteKeyPress(progress) {
+    if (!remotePlayer) return;
+    remotePlayer.sequenceProgress = progress;
+    const arrowEl = remotePlayer.dom.sequenceContainer.children[progress - 1];
+    if (arrowEl) arrowEl.classList.add('correct');
+}
+
+function resetGame() {
+    if (!localPlayer) return;
+    DOMElements.gameOverScreen.classList.remove('visible');
+
+    gameState.status = 'playing';
+    gameState.isTransitioning = false;
+    gameState.pendingNextWave = false;
+    gameState.sequenceTurnCounter = 0;
+    gameState.bossIsEnraged = false;
+    gameState.currentWave = 1;
+    gameState.isCrescendoWave = false;
+    
+    touchStartX = 0;
+    touchStartY = 0;
+
+    [localPlayer, remotePlayer].forEach(p => {
+        if (p) {
+            p.updateLives(3);
+            p.updateCombo(0);
+            p.successfulSequences = 0;
+            p.highestCombo = 0;
+            p.damageDealt = 0;
+            p.isIdle = true;
+        }
+    });
+    
+    const playerData = loadPlayerData();
+    localPlayer.updateLevel(playerData.highestWave);
+
+    if (gameState.mode === 'solo') {
+        if (gameState.bossMode) {
+            startWave(1);
+        } else {
+            localPlayer.startNewSequence();
+        }
+    } else if (gameState.isHost) {
+        startCountdown();
+        sendData({type: 'start_countdown'});
+    }
+}
+
+function gameOver(winnerName) {
+    if (gameState.status === 'gameover') return;
+    gameState.status = 'gameover';
+    
+    [localPlayer, remotePlayer].forEach(p => { 
+        if(p) cancelAnimationFrame(p.timerId);
+    });
+
+    const titleEl = DOMElements.gameOverTitle;
+    titleEl.innerHTML = '';
+    
+    const titleText = gameState.bossMode ? 'RUN COMPLETE' : 'GAME OVER';
+
+    titleText.split('').forEach((char, index) => {
+        const span = document.createElement('span');
+        span.className = 'char';
+        span.textContent = char === ' ' ? '\u00A0' : char;
+        span.style.animationDelay = `${index * 0.07}s`;
+        titleEl.appendChild(span);
+    });
+
+    if (winnerName) {
+        DOMElements.winnerNameDisplay.textContent = winnerName;
+        DOMElements.winnerNameDisplay.style.display = 'block';
+    } else {
+        DOMElements.winnerNameDisplay.style.display = 'none';
+    }
+    
+    DOMElements.statsCombo.textContent = localPlayer.highestCombo;
+    DOMElements.statsCleared.textContent = localPlayer.successfulSequences;
+    if (gameState.bossMode) {
+        DOMElements.damageStatContainer.style.display = 'block';
+        DOMElements.statsDamage.textContent = localPlayer.damageDealt;
+    } else {
+        DOMElements.damageStatContainer.style.display = 'none';
+    }
+    
+    DOMElements.gameOverScreen.classList.add('visible');
+}
+
+function toggleFullScreen() {
+    if (!document.fullscreenElement) {
+        document.documentElement.requestFullscreen().catch(err => {
+            alert(`Error attempting to enable full-screen mode: ${err.message} (${err.name})`);
+        });
+    } else {
+        if (document.exitFullscreen) {
+            document.exitFullscreen();
+        }
+    }
+}
+
+function updateFullscreenIcons() {
+    if (document.fullscreenElement) {
+        DOMElements.fullscreenIcon.classList.add('hidden');
+        DOMElements.exitFullscreenIcon.classList.remove('hidden');
+    } else {
+        DOMElements.fullscreenIcon.classList.remove('hidden');
+        DOMElements.exitFullscreenIcon.classList.add('hidden');
+    }
+}
+
+function sendChatMessage() {
+    if (DOMElements.chatInput.value.trim() !== '') {
+        const message = DOMElements.chatInput.value.trim();
+        addChatMessage(message, 'mine');
+        sendData({ type: 'chat', message: message });
+        DOMElements.chatInput.value = '';
+    }
+}
+
+// --- Touch Input Functions ---
+function handleTouchStart(evt) {
+    const firstTouch = evt.touches[0];
+    touchStartX = firstTouch.pageX;
+    touchStartY = firstTouch.pageY;
+}
+
+function handleTouchMove(evt) {
+    evt.preventDefault();
+}
+
+function handleTouchEnd(evt) {
+    if (!touchStartX || !touchStartY) return;
+    const touchEndX = evt.changedTouches[0].pageX;
+    const touchEndY = evt.changedTouches[0].pageY;
+
+    const diffX = touchEndX - touchStartX;
+    const diffY = touchEndY - touchStartY;
+
+    let swipeDirection = '';
+    if (Math.abs(diffX) > Math.abs(diffY)) {
+        if (Math.abs(diffX) > 30) {
+            swipeDirection = diffX > 0 ? 'ArrowRight' : 'ArrowLeft';
+        }
+    } else {
+        if (Math.abs(diffY) > 30) {
+            swipeDirection = diffY > 0 ? 'ArrowDown' : 'ArrowUp';
+        }
+    }
+
+    if (swipeDirection) {
+        handleKeyPress({key: swipeDirection, preventDefault: () => {}}); //Simulate key press
+    }
+
+    touchStartX = 0;
+    touchStartY = 0;
+}
+
+// --- Video Wall Functions ---
+function setVideoBackground() {
+    const url = gameState.videoUrl;
+    DOMElements.videoWallContainer.innerHTML = '';
+    if (!url) {
+        return;
+    }
+
+    const youtubeIdMatch = url.match(/(?:v=|youtu\.be\/|embed\/|watch?v=|&v=)([^&?#]+)/);
+
+    if (youtubeIdMatch && youtubeIdMatch[1]) {
+        const videoId = youtubeIdMatch[1];
+        const embedUrl = `https://www.youtube-nocookie.com/embed/${videoId}?autoplay=1&mute=0&loop=1&playlist=${videoId}&controls=0&showinfo=0&autohide=1&modestbranding=1&iv_load_policy=3`;
+        const iframe = document.createElement('iframe');
+        iframe.src = embedUrl;
+        iframe.setAttribute('frameborder', '0');
+        iframe.setAttribute('allow', 'autoplay; encrypted-media;');
+        DOMElements.videoWallContainer.appendChild(iframe);
+    } else if (url.toLowerCase().endsWith('.mp4')) {
+        const videoEl = document.createElement('video');
+        videoEl.src = url;
+        videoEl.autoplay = true;
+        videoEl.muted = false;
+        videoEl.loop = true;
+        videoEl.playsInline = true;
+        videoEl.volume = 1.0;
+        DOMElements.videoWallContainer.appendChild(videoEl);
+    }
+
+    DOMElements.videoWallContainer.insertAdjacentHTML('beforeend', '<div class="overlay"></div>');
+}
+
+function addChatMessage(message, type) {
+    const bubble = document.createElement('div');
+    bubble.classList.add('chat-bubble', type);
+    bubble.textContent = message;
+    DOMElements.chatBubbles.appendChild(bubble);
+    setTimeout(() => bubble.remove(), 5000);
+}
+
+init();

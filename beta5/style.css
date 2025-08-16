@@ -443,7 +443,7 @@ input[type="color"]::-moz-color-swatch {
     transition: opacity 0.3s, transform 0.3s, width 0.3s ease-in-out, height 0.3s ease-in-out;
     filter: drop-shadow(0 0 5px rgba(0,0,0,0.5));
     pointer-events: none;
-    position: relative; /* For the fever pulse pseudo-element */
+    position: relative; 
 }
 .arrow-icon .arrow-bg { transition: fill 0.2s; }
 .arrow-icon .arrow-shape { transition: fill 0.2s; }
@@ -468,7 +468,7 @@ input[type="color"]::-moz-color-swatch {
     100% { box-shadow: 0 0 10px rgba(244, 67, 54, 0.5); }
 }
 
-/* --- COMBO FEVER SYSTEM & NEW RAINBOW PULSE --- */
+/* --- COMBO FEVER SYSTEM & RAINBOW PULSE --- */
 .game-grid.combo-fever {
     --glow-color: var(--primary-color);
     --glow-size: 25px;
@@ -498,6 +498,11 @@ input[type="color"]::-moz-color-swatch {
     animation: 
         fever-pulse 1.5s infinite ease-in-out,
         rainbow-shift 3s linear infinite;
+}
+/* THIS IS THE FIX: It makes the arrow background transparent during fever */
+.game-grid.combo-fever .arrow-icon .arrow-bg {
+    fill: transparent;
+    transition: fill 0.3s ease;
 }
 /* --- END FEVER --- */
 

@@ -96,6 +96,16 @@ const DOMElements = {
     saveSettingsBtn: document.getElementById('save-settings-btn'),
     defaultsSettingsBtn: document.getElementById('defaults-settings-btn'),
     closeSettingsBtn: document.getElementById('close-settings-btn'),
+    objectiveBar: document.getElementById('objective-bar'),
+    objectiveText: document.querySelector('#objective-bar .objective-text'),
+    waveModeTimer: document.getElementById('wave-mode-timer'),
+    intermissionScreen: document.getElementById('intermission-screen'),
+    intermissionWave: document.getElementById('intermission-wave'),
+    powerUpOptions: document.getElementById('power-up-options'),
+    intermissionVideoInput: document.getElementById('intermission-video-input'),
+    intermissionChangeVideoBtn: document.getElementById('intermission-change-video-btn'),
+    continueRunBtn: document.getElementById('continue-run-btn'),
+    endRunBtn: document.getElementById('end-run-btn'),
 };
 
 // --- Settings Management ---
@@ -105,6 +115,7 @@ const defaultSettings = {
     colors: { up: '#2979FF', down: '#FF1744', left: '#7C4DFF', right: '#00E676', grid: '#161616' }
 };
 let currentSettings = JSON.parse(JSON.stringify(defaultSettings));
+let chosenPowerUpEffect = null;
 
 function hexToRgba(hex, alpha) {
     let r = 0, g = 0, b = 0;
@@ -253,6 +264,8 @@ const gameState = {
     bossCurrentHealth: 250,
     status: 'setup',
     videoUrl: '',
+    waveModeTimerId: null,
+    waveModeTimeLeft: 355, 
 };
 
 class Player {
@@ -274,6 +287,7 @@ class Player {
         this.decayActive = false;
         this.highestCombo = 0;
         this.damageDealt = 0;
+        this.hasComboShield = false;
 
         this.dom = {
             playerArea: document.getElementById(`player${id}-container`),
@@ -507,6 +521,19 @@ function setupUIListeners() {
         }
     });
 
+    DOMElements.intermissionChangeVideoBtn.addEventListener('click', () => {
+        const newUrl = DOMElements.intermissionVideoInput.value.trim();
+        if (newUrl) {
+            gameState.videoUrl = newUrl;
+            DOMElements.videoUrlInput.value = newUrl; // Keep them in sync
+            setVideoBackground();
+            DOMElements.intermissionVideoInput.value = '';
+        }
+    });
+    DOMElements.continueRunBtn.addEventListener('click', continueRun);
+    DOMElements.endRunBtn.addEventListener('click', () => window.location.reload());
+
+
     // Settings screen listeners
     DOMElements.settingsBtn.addEventListener('click', () => {
         updateSettingsUI();
@@ -579,8 +606,10 @@ function onStartGameClick() {
         setVideoBackground();
         
         if (gameState.bossMode) {
+            DOMElements.waveModeTimer.classList.remove('hidden');
             startWave(1);
         } else {
+            DOMElements.waveModeTimer.classList.add('hidden');
             localPlayer.startNewSequence();
         }
 
@@ -674,6 +703,7 @@ function setupConnection() {
                 remotePlayer.dom.playerArea.classList.add('is-remote-player');
                 gameState.videoUrl = data.videoUrl;
                 gameState.bossMode = data.bossMode;
+                if(gameState.bossMode && !gameState.isHost) DOMElements.waveModeTimer.classList.remove('hidden');
                 break;
             case 'new_sequence':
                 if (remotePlayer) {
@@ -735,6 +765,17 @@ function setupConnection() {
     });
 }
 
+function showObjective(text) {
+    DOMElements.objectiveText.textContent = text;
+    DOMElements.objectiveBar.classList.remove('hidden');
+    DOMElements.objectiveBar.classList.add('visible');
+
+    setTimeout(() => {
+        DOMElements.objectiveBar.classList.remove('visible');
+        DOMElements.objectiveBar.classList.add('hidden');
+    }, 4000);
+}
+
 // --- Announcement and Wave Logic ---
 function showAnnouncement(element, text, duration) {
     element.textContent = text;
@@ -748,6 +789,11 @@ function showAnnouncement(element, text, duration) {
 }
 
 async function startWave(waveNumber) {
+    if (waveNumber === 1 && gameState.bossMode) {
+        startWaveModeTimer();
+    }
+    gameState.status = 'playing';
+
     const completedWave = waveNumber - 1;
     if (completedWave > 0 && localPlayer.isLocal) {
         const playerData = loadPlayerData();
@@ -766,14 +812,17 @@ async function startWave(waveNumber) {
     gameState.isCrescendoWave = gameState.currentWave % 3 === 0;
     DOMElements.bossArea.classList.remove('crescendo-intro');
 
+    initBoss(gameState.isCrescendoWave);
+
     if (gameState.isCrescendoWave) {
         await showAnnouncement(DOMElements.warningEncounter, 'WARNING!!!', 2500);
-        initBoss(true);
+        showObjective(`Defeat ${gameState.bossName}!`);
     } else {
         if (waveNumber > 1) {
              await showAnnouncement(DOMElements.waveAnnouncement, `WAVE ${gameState.currentWave}`, 2000);
+        } else { // Wave 1
+            showObjective("Defeat as many enemies as you can in the time limit.");
         }
-        initBoss(false);
     }
     
     localPlayer.startNewSequence();
@@ -783,15 +832,6 @@ async function startWave(waveNumber) {
     }
     
     gameState.isTransitioning = false;
-}
-
-function rewardPlayer() {
-    if (localPlayer.lives < 3) {
-        localPlayer.lives++;
-        localPlayer.updateLives(localPlayer.lives);
-        return true;
-    }
-    return false;
 }
 
 function startCountdown() {
@@ -818,15 +858,49 @@ function startCountdown() {
                 
                 if (gameState.bossMode) {
                     if (gameState.isHost) {
+                        DOMElements.waveModeTimer.classList.remove('hidden');
                         startWave(1);
                     }
                 } else {
+                    DOMElements.waveModeTimer.classList.add('hidden');
                     localPlayer.startNewSequence();
                 }
             }, 1000);
         }
     }, 1000);
 }
+
+// --- Timer Functions ---
+function startWaveModeTimer() {
+    clearInterval(gameState.waveModeTimerId);
+    gameState.waveModeTimeLeft = 355; // Always reset to full time
+    updateWaveModeTimerDisplay(); 
+    gameState.waveModeTimerId = setInterval(updateWaveModeTimer, 1000);
+}
+
+function updateWaveModeTimer() {
+    gameState.waveModeTimeLeft--;
+    updateWaveModeTimerDisplay();
+
+    if (gameState.waveModeTimeLeft <= 0) {
+        clearInterval(gameState.waveModeTimerId);
+        gameOver("Time's Up!");
+        if (gameState.mode === 'multi') sendData({ type: 'game_over', winnerName: "Time's Up!" });
+    }
+}
+
+function updateWaveModeTimerDisplay() {
+    const minutes = Math.floor(gameState.waveModeTimeLeft / 60).toString().padStart(2, '0');
+    const seconds = (gameState.waveModeTimeLeft % 60).toString().padStart(2, '0');
+    DOMElements.waveModeTimer.textContent = `${minutes}:${seconds}`;
+
+    if (gameState.waveModeTimeLeft <= 30) {
+        DOMElements.waveModeTimer.classList.add('danger');
+    } else {
+        DOMElements.waveModeTimer.classList.remove('danger');
+    }
+}
+
 
 // --- Boss Functions ---
 function initBoss(isCrescendo) {
@@ -1025,7 +1099,8 @@ async function dealDamageToBoss(damage, player, isHeavyAttack = false) {
     updateBossHealth(newHealth, isHeavyAttack);
 
     if (newHealth <= 0) {
-        gameState.isTransitioning = true; 
+        gameState.isTransitioning = true;
+        cancelAnimationFrame(player.timerId); 
         await playDeathAnimation(gameState.isCrescendoWave);
         
         if (remotePlayer && !remotePlayer.isIdle) {
@@ -1034,11 +1109,11 @@ async function dealDamageToBoss(damage, player, isHeavyAttack = false) {
         }
 
         if (gameState.isCrescendoWave) {
-            if (rewardPlayer()) {
-                await showAnnouncement(DOMElements.rewardAnnouncement, '+1 LIFE', 1500);
-            }
+            clearInterval(gameState.waveModeTimerId);
+            showIntermissionScreen();
+        } else {
+            startWave(gameState.currentWave + 1);
         }
-        startWave(gameState.currentWave + 1);
     } else if (player.isLocal) {
         player.startNewSequence();
     }
@@ -1073,6 +1148,83 @@ function updateBossHealth(health, isHeavy = false) {
     }
 }
 
+// --- Intermission & Power-ups ---
+function showIntermissionScreen() {
+    gameState.status = 'intermission';
+    gameState.isTransitioning = false; 
+    DOMElements.intermissionWave.textContent = gameState.currentWave;
+    generatePowerUps();
+    DOMElements.intermissionScreen.classList.remove('hidden'); // THE FIX
+    DOMElements.intermissionScreen.classList.add('visible');
+}
+
+function generatePowerUps() {
+    const allPowerUps = [
+        { 
+            title: '❤️‍🩹 Second Wind', 
+            desc: 'Restore one lost life. (If at full health, gain a temporary extra life)',
+            effect: () => {
+                if (localPlayer.lives < 4) localPlayer.updateLives(localPlayer.lives + 1);
+            }
+        },
+        { 
+            title: '🛡️ Combo Shield', 
+            desc: 'Your combo will not reset on your next single mistake.',
+            effect: () => { localPlayer.hasComboShield = true; }
+        },
+        { 
+            title: '⏳ Overclock', 
+            desc: 'Adds 60 seconds to the timer for the next stage.',
+            effect: () => { gameState.waveModeTimeLeft += 60; }
+        },
+        {
+            title: '⚡ Hyperspeed Start',
+            desc: 'Begin the next stage with a 15-count combo.',
+            effect: () => { localPlayer.updateCombo(15); }
+        }
+    ];
+
+    // Fisher-Yates shuffle algorithm for stability
+    let currentIndex = allPowerUps.length, randomIndex;
+    while (currentIndex != 0) {
+        randomIndex = Math.floor(Math.random() * currentIndex);
+        currentIndex--;
+        [allPowerUps[currentIndex], allPowerUps[randomIndex]] = [allPowerUps[randomIndex], allPowerUps[currentIndex]];
+    }
+
+    const chosenPowerUps = allPowerUps.slice(0, 3);
+
+    DOMElements.powerUpOptions.innerHTML = '';
+    chosenPowerUps.forEach(powerup => {
+        const card = document.createElement('div');
+        card.className = 'power-up-card';
+        card.innerHTML = `<div class="power-up-title">${powerup.title}</div><div class="power-up-desc">${powerup.desc}</div>`;
+        card.addEventListener('click', () => {
+            document.querySelectorAll('.power-up-card').forEach(c => c.classList.remove('selected'));
+            card.classList.add('selected');
+            chosenPowerUpEffect = powerup.effect;
+            DOMElements.continueRunBtn.disabled = false;
+        });
+        DOMElements.powerUpOptions.appendChild(card);
+    });
+}
+
+function continueRun() {
+    DOMElements.intermissionScreen.classList.remove('visible');
+    DOMElements.intermissionScreen.classList.add('hidden'); // Hide it properly
+    DOMElements.continueRunBtn.disabled = true;
+
+    // Apply power-up effect first to potentially modify the upcoming timer
+    if (chosenPowerUpEffect) {
+        chosenPowerUpEffect();
+        chosenPowerUpEffect = null; // Reset for next time
+    }
+    
+    startWaveModeTimer(); // This will reset time to 355 AND start the interval
+    startWave(gameState.currentWave + 1);
+}
+
+
 // --- Core Game Logic ---
 function sendData(data) { if (conn && conn.open) { conn.send(data); } }
 function transitionToGameArea() {
@@ -1084,7 +1236,7 @@ function transitionToGameArea() {
 }
 
 function handleKeyPress(e) {
-    if (gameState.status === 'gameover' || titleScreenActive) return;
+    if (gameState.status !== 'playing' || titleScreenActive) return;
 
     const pressedKey = e.key;
     const action = Object.keys(currentSettings.keyBinds).find(act => currentSettings.keyBinds[act] === pressedKey);
@@ -1093,7 +1245,7 @@ function handleKeyPress(e) {
     
     if (gameState.status === 'setup') gameState.status = 'playing';
 
-    if(e.preventDefault) e.preventDefault();
+    e.preventDefault();
     const player = localPlayer;
     if (!player || !player.currentSequence || player.currentSequence.length === 0) return;
 
@@ -1150,6 +1302,15 @@ function handleCorrectKeyPress(player) {
 }
 
 function handleFailure(player) {
+    if (player.hasComboShield) {
+        player.hasComboShield = false;
+        // Maybe add a visual/sound effect for the shield breaking
+        player.dom.grid.classList.add('success-glow'); // Re-use an effect for now
+        setTimeout(() => player.dom.grid.classList.remove('success-glow'), 500);
+        player.startNewSequence(); // Restart the same sequence
+        return;
+    }
+
     player.lives--;
     player.updateLives(player.lives);
     player.updateCombo(0);
@@ -1193,8 +1354,17 @@ function handleRemoteKeyPress(progress) {
 function resetGame() {
     if (!localPlayer) return;
     DOMElements.gameOverScreen.classList.remove('visible');
+    DOMElements.gameOverScreen.classList.add('hidden');
+    DOMElements.intermissionScreen.classList.remove('visible');
+    DOMElements.intermissionScreen.classList.add('hidden');
 
-    gameState.status = 'playing';
+
+    clearInterval(gameState.waveModeTimerId);
+    DOMElements.waveModeTimer.classList.add('hidden');
+    DOMElements.waveModeTimer.classList.remove('danger');
+
+
+    gameState.status = 'setup'; // Reset to setup, will become 'playing' on first keypress
     gameState.isTransitioning = false;
     gameState.pendingNextWave = false;
     gameState.sequenceTurnCounter = 0;
@@ -1213,6 +1383,7 @@ function resetGame() {
             p.highestCombo = 0;
             p.damageDealt = 0;
             p.isIdle = true;
+            p.hasComboShield = false;
         }
     });
     
@@ -1221,8 +1392,10 @@ function resetGame() {
 
     if (gameState.mode === 'solo') {
         if (gameState.bossMode) {
+            DOMElements.waveModeTimer.classList.remove('hidden');
             startWave(1);
         } else {
+            DOMElements.waveModeTimer.classList.add('hidden');
             localPlayer.startNewSequence();
         }
     } else if (gameState.isHost) {
@@ -1235,6 +1408,8 @@ function gameOver(winnerName) {
     if (gameState.status === 'gameover') return;
     gameState.status = 'gameover';
     
+    clearInterval(gameState.waveModeTimerId);
+
     [localPlayer, remotePlayer].forEach(p => { 
         if(p) cancelAnimationFrame(p.timerId);
     });
@@ -1268,6 +1443,7 @@ function gameOver(winnerName) {
         DOMElements.damageStatContainer.style.display = 'none';
     }
     
+    DOMElements.gameOverScreen.classList.remove('hidden');
     DOMElements.gameOverScreen.classList.add('visible');
 }
 

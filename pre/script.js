@@ -311,6 +311,7 @@ class Player {
         this.isIdle = true;
         this.level = 0;
         this.lives = 3;
+        this.maxLives = 3; // NEW: Add maxLives property
         this.combo = 0;
         this.sequenceProgress = 0;
         this.successfulSequences = 0;
@@ -370,6 +371,14 @@ class Player {
             setTimeout(() => this.dom.comboCount.classList.remove('pop'), 200);
         } else {
             this.dom.comboContainer.classList.remove('visible');
+        }
+
+        // UPDATED: Grant extra life, but capped at the standard 3
+        if (this.isLocal && this.combo > 0 && this.combo % 50 === 0) {
+            if (this.lives < 3) { // Only restore up to the default max of 3
+                this.updateLives(this.lives + 1);
+                showAnnouncement(DOMElements.rewardAnnouncement, '+1 LIFE!', 1500);
+            }
         }
 
         const feverIsActive = this.combo >= 15;
@@ -1116,6 +1125,7 @@ function onRematchClick() {
 function restartMatch() {
     DOMElements.gameOverScreen.classList.remove('visible');
     
+    // Reset game state variables
     gameState.status = 'setup';
     gameState.isTransitioning = false;
     gameState.pendingNextWave = false;
@@ -1128,7 +1138,8 @@ function restartMatch() {
     
     [localPlayer, remotePlayer].forEach(p => {
         if (p) {
-            p.updateLives(3);
+            p.maxLives = 3; // Reset max lives to default
+            p.updateLives(3); // Heal to the default of 3
             p.updateCombo(0);
             p.successfulSequences = 0;
             p.highestCombo = 0;
@@ -1582,11 +1593,12 @@ function showIntermissionScreen() {
 function generatePowerUps() {
     const allPowerUps = [
         { 
-            title: 'Second Wind', 
-            desc: 'Restore one lost life.',
-            badge: '❤️‍🩹',
+            title: 'Reinforce', 
+            desc: 'Increase your maximum lives by one and fully heal.',
+            badge: '❤️‍🔥',
             effect: () => {
-                if (localPlayer.lives < 4) localPlayer.updateLives(localPlayer.lives + 1);
+                localPlayer.maxLives += 1;
+                localPlayer.updateLives(localPlayer.maxLives);
             }
         },
         { 

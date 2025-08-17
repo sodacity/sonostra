@@ -283,15 +283,15 @@ function listenForKeybind(action, btnElement) {
 const BOSS_NAMES = ["Sonus", "Tremor", "Siren", "Symphony", "Echo"];
 const MENACING_BOSS_NAMES = ["Sonoris", "Noctaria", "Legion", "Echolyra", "Stellaria", "Orbisona"];
 const BOSS_ELEMENTS = ["fire", "poison", "ice"];
-const BOSS_ACTIONS = ["timer_burn", "blur", "stealth", "heal", "seismic_shift", "rhythm_shift"];
+const BOSS_ACTIONS = ["timer_burn", "blur", "stealth", "heal", "glyph_storm", "clockstopper"];
 const ATTACK_NAMES = {
     timer_burn: 'TIMER BURN',
     blur: 'DISTORTION FIELD',
     stealth: 'STEALTH SEQUENCE',
-    seismic_shift: 'SEISMIC SHIFT',
-    rhythm_shift: 'DECAY',
     stagger: 'STAGGERED PULSE',
-    blur_stealth: 'DISTORTED STEALTH'
+    blur_stealth: 'DISTORTED STEALTH',
+    glyph_storm: 'GLYPH STORM',
+    clockstopper: 'CLOCKSTOPPER'
 };
 const ARROW_SVG = {
     'ArrowUp': `<svg class="arrow-icon" viewBox="0 0 100 100"><path class="arrow-bg" fill="url(#grad-up)" d="M50,0 L100,50 L85,65 L50,30 L15,65 L0,50 Z"></path><path class="arrow-shape" fill="rgba(255,255,255,0.8)" d="M50,15 L80,45 L68,57 L50,39 L32,57 L20,45 Z"></path></svg>`,
@@ -549,6 +549,7 @@ function setupUIListeners() {
         DOMElements.toggleHubBtn.classList.remove('hidden');
         DOMElements.newsContainer.addEventListener('animationend', () => {
             DOMElements.newsContainer.classList.add('hidden');
+            DOMElements.newsContainer.classList.remove('anim-pop-out');
         }, { once: true });
     });
 
@@ -561,6 +562,7 @@ function setupUIListeners() {
 
     DOMElements.closeSetupBtn.addEventListener('click', () => {
         DOMElements.gameSetupModal.classList.add('hidden');
+        DOMElements.connectionSetup.classList.remove('anim-pop-in');
     });
 
     DOMElements.playerListToggleBtn.addEventListener('click', () => {
@@ -712,6 +714,7 @@ function populatePlayerListModal() {
 
 function initializeHub() {
     DOMElements.hubView.classList.remove('hidden');
+    DOMElements.newsContainer.classList.remove('anim-pop-out');
     DOMElements.newsContainer.classList.add('anim-pop-in');
     DOMElements.lobbyPlayerBar.style.display = 'flex';
     connectToLobby();
@@ -926,17 +929,20 @@ function handleGameModeChange() {
 function onStartGameClick() {
     gameState.bossMode = DOMElements.bossModeToggle.checked;
     gameState.videoUrl = DOMElements.videoUrlInput.value.trim();
+    gameState.isHost = true; // Set player as host for ALL game modes they initiate.
     
     if (gameState.mode === 'solo') {
         localPlayer = new Player(1, currentSettings.playerName, null, true);
         const playerData = loadPlayerData();
         localPlayer.updateLevel(playerData.highestWave);
+        localPlayer.dom.grid.addEventListener('touchstart', handleTouchStart, false);
+        localPlayer.dom.grid.addEventListener('touchmove', handleTouchMove, false);
+        localPlayer.dom.grid.addEventListener('touchend', handleTouchEnd, false);
         DOMElements.player2Container.style.display = 'none';
         transitionToGameArea();
         startCountdown();
 
     } else { // Multiplayer - Create Game
-        gameState.isHost = true;
         const roomName = DOMElements.roomNameInput.value.trim();
         if (!roomName) {
             alert("Please enter a room name to create a multiplayer game.");
@@ -954,6 +960,9 @@ function onStartGameClick() {
             localPlayer = new Player(1, currentSettings.playerName, peer.id, true);
             const playerData = loadPlayerData();
             localPlayer.updateLevel(playerData.highestWave);
+            localPlayer.dom.grid.addEventListener('touchstart', handleTouchStart, false);
+            localPlayer.dom.grid.addEventListener('touchmove', handleTouchMove, false);
+            localPlayer.dom.grid.addEventListener('touchend', handleTouchEnd, false);
 
             peer.on('connection', (newConn) => {
                 conn = newConn;
@@ -1003,6 +1012,9 @@ function onJoinGameClick() {
             console.log("Connected to host!");
             localPlayer = new Player(2, currentSettings.playerName, id, true);
             localPlayer.updateLevel(playerData.highestWave);
+            localPlayer.dom.grid.addEventListener('touchstart', handleTouchStart, false);
+            localPlayer.dom.grid.addEventListener('touchmove', handleTouchMove, false);
+            localPlayer.dom.grid.addEventListener('touchend', handleTouchEnd, false);
             DOMElements.player1Container.style.display = 'flex';
             DOMElements.player2Container.style.display = 'flex';
             setupInGameConnection();
@@ -1318,7 +1330,7 @@ function hostCheckBossTrigger() {
 }
 
 function triggerBossAction() {
-    let availableActions = ["timer_burn", "blur", "stealth", "heal", "seismic_shift", "rhythm_shift"];
+    let availableActions = ["timer_burn", "blur", "stealth", "heal", "glyph_storm", "clockstopper"];
     if (gameState.currentWave >= 4) {
         availableActions.push('stagger');
         if (gameState.isCrescendoWave) {
@@ -1376,10 +1388,32 @@ function showAttackAnnouncement(attackType, player, isDramatic = false) {
     }, 2500);
 }
 
+function createGlyphStorm(player) {
+    const grid = player.dom.grid;
+    const stormContainer = document.createElement('div');
+    stormContainer.className = 'glyph-storm-container';
+
+    const glyphs = ['✧', '✦', '✡', '✢', '✜', '✥', '✳'];
+    for(let i = 0; i < 15; i++) {
+        const glyph = document.createElement('div');
+        glyph.className = 'drifting-glyph';
+        glyph.textContent = glyphs[Math.floor(Math.random() * glyphs.length)];
+        glyph.style.left = `${Math.random() * 100}%`;
+        glyph.style.top = `${Math.random() * 100}%`;
+        glyph.style.animationDuration = `${(Math.random() * 2) + 3}s`;
+        glyph.style.animationDelay = `${Math.random() * 2}s`;
+        stormContainer.appendChild(glyph);
+    }
+    grid.appendChild(stormContainer);
+    setTimeout(() => {
+        stormContainer.remove();
+    }, 5000); // Remove after the longest animation finishes
+}
+
 function applyBossAttack(attackType, player) {
     if (!player) return;
     
-    showAttackAnnouncement(attackType, player, attackType === 'rhythm_shift');
+    showAttackAnnouncement(attackType, player);
     player.dom.playerArea.classList.add('shake');
     setTimeout(() => player.dom.playerArea.classList.remove('shake'), 500);
 
@@ -1401,13 +1435,6 @@ function applyBossAttack(attackType, player) {
         case 'stealth':
             player.dom.sequenceContainer.classList.add('stealth');
             break;
-        case 'seismic_shift':
-            player.dom.grid.classList.add('grid-tilting');
-            setTimeout(() => player.dom.grid.classList.remove('grid-tilting'), 3000);
-            break;
-        case 'rhythm_shift':
-            player.decayActive = true;
-            return;
         case 'stagger':
             displaySequenceStaggered(player);
             break;
@@ -1416,6 +1443,16 @@ function applyBossAttack(attackType, player) {
             setTimeout(() => {
                 player.dom.sequenceContainer.classList.add('stealth');
             }, 1000);
+            break;
+        case 'glyph_storm':
+            createGlyphStorm(player);
+            break;
+        case 'clockstopper':
+            const timerContainer = player.dom.timerBar.parentElement;
+            timerContainer.classList.add('timer-hidden');
+            setTimeout(() => {
+                timerContainer.classList.remove('timer-hidden');
+            }, 5000); // Hides for 5 seconds
             break;
     }
 }
@@ -1725,6 +1762,7 @@ function handleCorrectKeyPress(player) {
             const damageType = (player.combo > 0 && player.combo % 10 === 0) ? 'heavy' : 'regular';
             if (gameState.isHost) {
                 dealDamageToBoss(damageType === 'heavy' ? 25 : 5, player, damageType === 'heavy');
+                hostCheckBossTrigger(); // HOST CHECKS TO ATTACK AFTER DEALING DAMAGE
             } else {
                  sendData({ type: 'damage_boss', damageType: damageType });
                 if (!gameState.pendingNextWave) {
@@ -1733,10 +1771,6 @@ function handleCorrectKeyPress(player) {
             }
         } else {
             setTimeout(() => player.startNewSequence(), 300);
-        }
-        
-        if (gameState.isHost) {
-            hostCheckBossTrigger();
         }
     }
 }

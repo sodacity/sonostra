@@ -101,6 +101,7 @@ body {
     flex-direction: column;
     justify-content: center;
     align-items: center;
+    position: relative;
 }
 
 /* --- Play Game Button (Now inside News) --- */
@@ -140,6 +141,8 @@ body {
     overflow-y: auto;
     color: var(--text-color);
     padding: 1rem 2rem 2rem 2rem;
+    position: relative;
+    z-index: 2;
 }
 
 .news-header {
@@ -324,7 +327,7 @@ body {
 .chat-message {
     background-color: white;
     color: black;
-    padding: 0.75rem 1.25rem;
+    padding: 0.85rem 1.5rem; /* Increased padding */
     font-family: var(--font-display);
     position: relative;
     border: 3px solid black;
@@ -357,11 +360,13 @@ body {
 .chat-message-name {
     font-weight: 900;
     color: var(--persona-red);
-    margin-right: 0.5rem;
+    margin-right: 0.75rem; /* Increased margin */
+    font-size: 1.1rem; /* Increased font size */
 }
 .chat-message-text {
     font-weight: 500;
     word-wrap: break-word;
+    font-size: 1.1rem; /* Increased font size */
 }
 
 
@@ -866,7 +871,7 @@ input[type="color"]::-moz-color-swatch {
     transform: translate(-50%, -50%);
     display: flex;
     gap: var(--arrow-gap, 1rem);
-    transition: transform 0.2s ease-in-out, gap 0.3s ease-in-out;
+    transition: transform 0.2s ease-in-out, gap 0.3s ease-in-out, filter 0.3s ease-in-out;
     pointer-events: none;
 }
 
@@ -1427,6 +1432,18 @@ input[type="color"]::-moz-color-swatch {
 .game-grid.blurred { filter: blur(12px); }
 .sequence-container.stealth .arrow-icon { animation: fade-out-stealth 3s forwards 1s; }
 @keyframes fade-out-stealth { to { opacity: 0; } }
+
+.sequence-container.color-scramble {
+    animation: color-scramble-anim 5s linear;
+}
+@keyframes color-scramble-anim {
+    0% { filter: hue-rotate(0deg) saturate(1); }
+    25% { filter: hue-rotate(120deg) saturate(1.5); }
+    50% { filter: hue-rotate(240deg) saturate(1); }
+    75% { filter: hue-rotate(60deg) saturate(2); }
+    100% { filter: hue-rotate(0deg) saturate(1); }
+}
+
 @keyframes screen-shake {
     10%, 90% { transform: translate3d(-1px, 0, 0); }
     20%, 80% { transform: translate3d(2px, 0, 0); }
@@ -1453,11 +1470,84 @@ input[type="color"]::-moz-color-swatch {
 @keyframes bubble { 0% { transform: scale(0); } 100% { transform: scale(1.5); } }
 @keyframes ice-crack { 50% { backdrop-filter: blur(2px); } }
 
+/* --- In-Game Chat Styles --- */
+#in-game-chat-bar {
+    position: fixed;
+    bottom: 1rem;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    width: 90%;
+    max-width: 800px;
+    gap: 0.5rem;
+    z-index: 201; /* Above game over screen */
+}
+#in-game-chat-input {
+    flex-grow: 1;
+    padding: 0.75rem;
+    background: rgba(0, 0, 0, 0.5);
+    border: 1px solid var(--glass-border);
+    border-radius: 8px;
+    color: var(--text-color);
+    font-size: 1rem;
+}
+#in-game-chat-send-btn {
+    padding: 0.75rem 1.5rem;
+    font-size: 1rem;
+    background: var(--primary-color);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: 700;
+}
+.chat-bubble-container {
+    position: absolute;
+    bottom: calc(100% + 50px); /* Position above player header and timer bar */
+    left: 0;
+    width: 100%;
+    height: 150px;
+    display: flex;
+    flex-direction: column-reverse;
+    align-items: center;
+    gap: 0.5rem;
+    padding-bottom: 1rem;
+    pointer-events: none;
+    z-index: 50;
+}
+.chat-bubble {
+    font-family: var(--font-display);
+    padding: 1rem 1.75rem;
+    border-radius: 20px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+    opacity: 0;
+    max-width: 90%;
+    word-wrap: break-word;
+    font-size: 1.5rem; /* Increased font size */
+    animation: bubble-fade 5s ease-in-out forwards;
+    text-align: center;
+}
+@keyframes bubble-fade {
+    0% { opacity: 0; transform: translateY(20px); }
+    10% { opacity: 1; transform: translateY(0); }
+    90% { opacity: 1; transform: translateY(0); }
+    100% { opacity: 0; transform: translateY(-20px); }
+}
+.chat-bubble.local {
+    background: var(--primary-color);
+    color: white;
+}
+.chat-bubble.remote {
+    background: var(--secondary-color);
+    color: white;
+}
+
+
 /* --- Mobile Responsive Styles --- */
 @media (max-width: 768px) {
     #news-container {
-        height: 60vh;
-        width: 95%;
+        height: 80vh; /* Allow more height for scrolling on mobile */
+        max-height: 90vh;
     }
     .news-header {
         flex-direction: column;
@@ -1641,6 +1731,94 @@ input[type="color"]::-moz-color-swatch {
     color: var(--primary-color);
 }
 
+.mute-btn {
+    position: absolute;
+    top: 0.5rem;
+    right: 1.5rem;
+    z-index: 10;
+    background: none;
+    border: none;
+    color: white;
+    font-size: 2.5rem;
+    cursor: pointer;
+    width: 40px;
+    height: 40px;
+    padding: 4px;
+}
+.mute-btn svg {
+    width: 100%;
+    height: 100%;
+    fill: white;
+    filter: drop-shadow(1px 1px 2px rgba(0,0,0,0.7));
+}
+
+/* --- New Hub Clock Styles --- */
+.hub-clock {
+    position: fixed;
+    top: 1rem;
+    right: 1rem;
+    z-index: 998;
+    padding: 0.5rem 1rem;
+    font-family: var(--font-display);
+    font-weight: 700;
+    color: var(--text-color);
+    text-align: right;
+    text-shadow: 0 2px 5px rgba(0,0,0,0.5);
+}
+.hub-clock .time {
+    font-size: 1.5rem;
+}
+.hub-clock .day {
+    font-size: 1rem;
+    opacity: 0.8;
+}
+
+/* --- Hub Background Glyphs --- */
+#hub-background-glyphs {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: -1;
+    overflow: hidden;
+    pointer-events: none;
+}
+
+.hub-glyph {
+    position: absolute;
+    opacity: 0;
+    animation-name: float-glyph;
+    animation-timing-function: linear;
+    animation-iteration-count: infinite;
+}
+
+.hub-glyph svg {
+    width: 100%;
+    height: 100%;
+    opacity: 0.1;
+    filter: drop-shadow(0 0 8px var(--primary-color));
+}
+
+.hub-glyph svg .arrow-bg {
+    /* Fill is now set dynamically via JavaScript */
+}
+
+@keyframes float-glyph {
+    0% {
+        transform: translateY(105vh) rotate(0deg);
+        opacity: 0;
+    }
+    10%, 90% {
+        opacity: 1;
+    }
+    100% {
+        transform: translateY(-10vh) rotate(360deg);
+        opacity: 0;
+    }
+}
+
+
 /* --- New Boss Attack Effect Styles --- */
 .glyph-storm-container {
     position: absolute;
@@ -1679,7 +1857,24 @@ input[type="color"]::-moz-color-swatch {
     }
 }
 
-.timer-bar-container.timer-hidden {
-    opacity: 0;
-    transition: opacity 0.5s ease-in-out;
+.static-veil-effect {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 10;
+    background-image: repeating-linear-gradient(0deg, rgba(255,255,255,0.25), rgba(255,255,255,0.25) 1px, transparent 1px, transparent 2px);
+    background-size: 100% 3px;
+    animation: static-flicker 0.1s infinite;
+    pointer-events: none;
+}
+
+@keyframes static-flicker {
+    0% { opacity: 0.3; }
+    20% { opacity: 0.5; }
+    40% { opacity: 0.4; }
+    60% { opacity: 0.7; }
+    80% { opacity: 0.3; }
+    100% { opacity: 0.6; }
 }

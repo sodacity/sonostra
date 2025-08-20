@@ -5,7 +5,7 @@ function loadPlayerData() {
         return JSON.parse(saved);
     }
     // Return a default object with all stats
-    return { 
+    return {
         highestWave: 0,
         highestCombo: 0,
         totalSequences: 0,
@@ -49,6 +49,8 @@ const DOMElements = {
     titleScreen: document.getElementById('title-screen'),
     // HUB ELEMENTS
     hubView: document.getElementById('hub-view'),
+    hubClock: document.getElementById('hub-clock'),
+    hubBackgroundGlyphs: document.getElementById('hub-background-glyphs'),
     newsContainer: document.getElementById('news-container'),
     hubPlayGameBtn: document.getElementById('hub-play-game-btn'),
     lobbyNotifications: document.getElementById('lobby-notifications'),
@@ -66,6 +68,9 @@ const DOMElements = {
     howToPlayContent: document.getElementById('how-to-play-content'),
     closeHubBtn: document.getElementById('close-hub-btn'),
     toggleHubBtn: document.getElementById('toggle-hub-btn'),
+    muteBtn: document.getElementById('mute-btn'),
+    unmutedIcon: document.getElementById('unmuted-icon'),
+    mutedIcon: document.getElementById('muted-icon'),
     // MODAL AND OLD ELEMENTS
     gameSetupModal: document.getElementById('game-setup-modal'),
     closeSetupBtn: document.getElementById('close-setup-btn'),
@@ -87,6 +92,7 @@ const DOMElements = {
     gameOverTitle: document.getElementById('game-over-title'),
     winnerNameDisplay: document.getElementById('winner-name-display'),
     rematchBtn: document.getElementById('rematch-btn'),
+    returnToTitleBtn: document.getElementById('return-to-title-btn'),
     bossArea: document.getElementById('boss-area'),
     bossSymbol: document.getElementById('boss-symbol'),
     bossName: document.getElementById('boss-name'),
@@ -137,16 +143,24 @@ const DOMElements = {
     playerListModal: document.getElementById('player-list-modal'),
     playerListContainer: document.getElementById('player-list-container'),
     closePlayerListBtn: document.getElementById('close-player-list-btn'),
+    // In-Game Chat Elements
+    inGameChatBar: document.getElementById('in-game-chat-bar'),
+    inGameChatInput: document.getElementById('in-game-chat-input'),
+    inGameChatSendBtn: document.getElementById('in-game-chat-send-btn'),
+    chatBubbleContainerP1: document.getElementById('chat-bubble-container-p1'),
+    chatBubbleContainerP2: document.getElementById('chat-bubble-container-p2'),
 };
 
 // --- Settings Management ---
 const defaultSettings = {
     playerName: 'Rookie',
     keyBinds: { ArrowUp: 'ArrowUp', ArrowDown: 'ArrowDown', ArrowLeft: 'ArrowLeft', ArrowRight: 'ArrowRight' },
-    colors: { up: '#2979FF', down: '#FF1744', left: '#7C4DFF', right: '#00E676', grid: '#161616' }
+    colors: { up: '#2979FF', down: '#FF1744', left: '#7C4DFF', right: '#00E676', grid: '#161616' },
+    musicMuted: false,
 };
 let currentSettings = JSON.parse(JSON.stringify(defaultSettings));
 let chosenPowerUpEffect = null;
+let hubMusic = null;
 
 // --- REFACTORED LOBBY/GAME STATE ---
 let peer, conn;
@@ -155,6 +169,7 @@ let touchStartX = 0, touchStartY = 0;
 const LOBBY_HOST_ID = 'Sonostra-Lobby-Host-9a8b7c6d';
 let peerConnections = new Map(); // Stores direct connections to other players
 let titleScreenActive = true;
+let clockInterval = null;
 
 const gameState = {
     isHost: false, // Is this player the host of the CURRENT GAME
@@ -220,6 +235,7 @@ function applySettings() {
     });
 
     DOMElements.displayPlayerName.textContent = currentSettings.playerName;
+    updateMuteIcon();
 }
 
 function updateSettingsUI() {
@@ -243,7 +259,8 @@ function loadSettings() {
     const saved = localStorage.getItem('sonostraSettings');
     if (saved) {
         const savedSettings = JSON.parse(saved);
-        Object.assign(currentSettings, savedSettings);
+        // Ensure new settings have defaults if not in saved data
+        currentSettings = { ...defaultSettings, ...savedSettings };
     }
     applySettings();
     updateSettingsUI();
@@ -292,7 +309,7 @@ function listenForKeybind(action, btnElement) {
 const BOSS_NAMES = ["Sonus", "Tremor", "Siren", "Symphony", "Echo"];
 const MENACING_BOSS_NAMES = ["Sonoris", "Noctaria", "Legion", "Echolyra", "Stellaria", "Orbisona"];
 const BOSS_ELEMENTS = ["fire", "poison", "ice"];
-const BOSS_ACTIONS = ["timer_burn", "blur", "stealth", "heal", "glyph_storm", "clockstopper"];
+const BOSS_ACTIONS = ["timer_burn", "blur", "stealth", "heal", "glyph_storm", "static_veil"];
 const ATTACK_NAMES = {
     timer_burn: 'TIMER BURN',
     blur: 'DISTORTION FIELD',
@@ -300,7 +317,8 @@ const ATTACK_NAMES = {
     stagger: 'STAGGERED PULSE',
     blur_stealth: 'DISTORTED STEALTH',
     glyph_storm: 'GLYPH STORM',
-    clockstopper: 'CLOCKSTOPPER'
+    static_veil: 'STATIC VEIL',
+    color_scramble: 'COLOR SCRAMBLE'
 };
 const ARROW_SVG = {
     'ArrowUp': `<svg class="arrow-icon" viewBox="0 0 100 100"><path class="arrow-bg" fill="url(#grad-up)" d="M50,0 L100,50 L85,65 L50,30 L15,65 L0,50 Z"></path><path class="arrow-shape" fill="rgba(255,255,255,0.8)" d="M50,15 L80,45 L68,57 L50,39 L32,57 L20,45 Z"></path></svg>`,
@@ -330,6 +348,7 @@ class Player {
         this.timeBonus = 0;
         this.highestCombo = 0;
         this.damageDealt = 0;
+        this.currentSequence = []; // Always have a sequence array
 
         // --- Arms Race System Properties ---
         this.hasSequenceFlow = false;
@@ -353,7 +372,8 @@ class Player {
             timerEffectFire: document.getElementById(`timer-fire-p${id}`),
             timerEffectPoison: document.getElementById(`timer-poison-p${id}`),
             timerEffectIce: document.getElementById(`timer-ice-p${id}`),
-            badge: document.getElementById(`badge-p${id}`)
+            badge: document.getElementById(`badge-p${id}`),
+            chatBubbleContainer: document.getElementById(`chat-bubble-container-p${id}`),
         };
         this.updateName(name);
         this.updateLives(3);
@@ -374,7 +394,9 @@ class Player {
 
     updateCombo(combo) {
         this.combo = combo;
-        this.highestCombo = Math.max(this.highestCombo, this.combo);
+        if (this.isLocal) {
+            this.highestCombo = Math.max(this.highestCombo, this.combo);
+        }
         this.dom.comboCount.textContent = this.combo;
 
         if (this.combo > 0) {
@@ -386,7 +408,7 @@ class Player {
         }
 
         if (this.isLocal && this.combo > 0 && this.combo % 50 === 0) {
-            if (this.lives < 3) {
+            if (this.lives < this.maxLives) {
                 this.updateLives(this.lives + 1);
                 showAnnouncement(DOMElements.rewardAnnouncement, '+1 LIFE!', 1500);
             }
@@ -395,17 +417,17 @@ class Player {
         if (this.isLocal && this.hasComboPlating && this.combo > 0 && this.combo % 25 === 0) {
             if (this.activePlates < 1) {
                 this.activePlates++;
-                // Can add visual feedback for gaining a plate here
             }
         }
-
-        const feverIsActive = this.combo >= 15;
+        this.updateFeverState(this.combo >= 15);
+    }
+    
+    updateFeverState(isFever) {
         const wasFeverActive = this.dom.grid.classList.contains('combo-fever');
-
-        if (feverIsActive && !wasFeverActive) {
+        if (isFever && !wasFeverActive) {
             this.dom.grid.classList.add('combo-fever');
             this.dom.feverText.classList.remove('hidden');
-        } else if (!feverIsActive && wasFeverActive) {
+        } else if (!isFever && wasFeverActive) {
             this.dom.grid.classList.remove('combo-fever');
             this.dom.feverText.classList.add('hidden');
         }
@@ -427,15 +449,15 @@ class Player {
             sendData({ type: 'player_state_update', isIdle: this.isIdle });
         }
 
-        this.dom.sequenceContainer.classList.remove('stealth');
+        this.dom.sequenceContainer.classList.remove('stealth', 'color-scramble');
         this.dom.grid.classList.remove('blurred');
 
         let baseTime = 10000;
-        if (this.hasSequenceFlow) baseTime *= 1.1; 
+        if (this.hasSequenceFlow) baseTime *= 1.1;
 
         let timeReduction = gameState.currentWave * 100;
         if (gameState.currentWave >= 4) timeReduction += (gameState.currentWave - 3) * 200;
-        
+
         this.timeLimit = Math.max(3000, baseTime - timeReduction);
 
         if (gameState.stumblePenalty && gameState.lastFailer === this.peerId) {
@@ -447,47 +469,44 @@ class Player {
         this.sequenceProgress = 0;
 
         if (!sequence) {
-            let sequenceLength;
+            const baseLength = 2;
+            let currentWaveLength = baseLength + gameState.currentWave;
+            
             if (gameState.isCrescendoWave) {
-                sequenceLength = Math.floor(Math.random() * 4) + 9;
-            } else {
-                const baseLength = 3;
-                const lengthIncrease = Math.floor(gameState.currentWave / 2);
-                sequenceLength = Math.min(12, baseLength + lengthIncrease);
+                let previousWaveLength = baseLength + (gameState.currentWave - 1);
+                currentWaveLength = previousWaveLength + 3;
             }
 
             if (gameState.overwhelmActive && this.activePlates > 0) {
-                sequenceLength++;
+                currentWaveLength++;
             }
-
-            this.currentSequence = generateComplexSequence(sequenceLength);
+            this.currentSequence = generateComplexSequence(currentWaveLength);
 
         } else {
             this.currentSequence = sequence;
         }
 
         this.displaySequence();
-        this.startTimer();
-
-        if (this.isLocal && gameState.mode === 'multi') {
-             sendData({ type: 'new_sequence', sequence: this.currentSequence });
+        if (this.isLocal) {
+            this.startTimer();
         }
     }
 
     displaySequence() {
-        const sequenceLength = this.currentSequence.length;
+        const sequence = this.currentSequence || [];
+        const sequenceLength = sequence.length;
         const grid = this.dom.grid;
         const container = this.dom.sequenceContainer;
         const availableWidth = grid.offsetWidth - 40;
         const maxArrowSize = 80;
         const minArrowSize = 35;
-        let idealSize = (availableWidth / sequenceLength) - 10;
+        let idealSize = (availableWidth / (sequenceLength || 1)) - 10;
         let finalArrowSize = Math.max(minArrowSize, Math.min(idealSize, maxArrowSize));
         let finalArrowGap = finalArrowSize * 0.15;
         container.style.setProperty('--arrow-size', `${finalArrowSize}px`);
         container.style.setProperty('--arrow-gap', `${finalArrowGap}px`);
         container.innerHTML = '';
-        this.currentSequence.forEach((arrowKey, index) => {
+        sequence.forEach((arrowKey, index) => {
             let arrowHTML = ARROW_SVG[arrowKey];
             if(this.isLocal && this.hasVulnerabilityScan && index === 0) {
                  arrowHTML = arrowHTML.replace('class="arrow-bg"', 'class="arrow-bg critical"');
@@ -519,7 +538,7 @@ function init() {
     loadSettings();
     setupTitleScreenListeners();
     setupUIListeners();
-    populateHowToPlay(); // Populate the how-to-play examples on startup
+    populateHowToPlay();
 
     if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
@@ -581,7 +600,12 @@ function setupUIListeners() {
     // HUB LISTENERS
     DOMElements.hubPlayGameBtn.addEventListener('click', () => {
         DOMElements.newsContainer.classList.add('anim-pop-out');
-        DOMElements.toggleHubBtn.classList.remove('hidden');
+        DOMElements.newsContainer.addEventListener('animationend', () => {
+            DOMElements.newsContainer.classList.add('hidden');
+            DOMElements.newsContainer.classList.remove('anim-pop-out');
+        }, { once: true });
+
+        DOMElements.toggleHubBtn.classList.add('hidden');
 
         setTimeout(() => {
             DOMElements.gameSetupModal.classList.remove('hidden');
@@ -608,6 +632,9 @@ function setupUIListeners() {
     DOMElements.closeSetupBtn.addEventListener('click', () => {
         DOMElements.gameSetupModal.classList.add('hidden');
         DOMElements.connectionSetup.classList.remove('anim-pop-in');
+        if (DOMElements.newsContainer.classList.contains('hidden')) {
+            DOMElements.toggleHubBtn.classList.remove('hidden');
+        }
     });
 
     DOMElements.playerListToggleBtn.addEventListener('click', () => {
@@ -660,6 +687,9 @@ function setupUIListeners() {
         gameState.videoUrl = DOMElements.videoUrlInput.value.trim();
     });
     DOMElements.rematchBtn.addEventListener('click', onRematchClick);
+    DOMElements.returnToTitleBtn.addEventListener('click', () => {
+        window.location.reload();
+    });
     DOMElements.fullscreenBtn.addEventListener('click', toggleFullScreen);
     DOMElements.changeVideoBtn.addEventListener('click', () => {
         const newUrl = DOMElements.nextVideoInput.value.trim();
@@ -704,6 +734,16 @@ function setupUIListeners() {
             updateSettingsUI();
         }
     });
+
+    // In-Game Chat Listeners
+    DOMElements.inGameChatSendBtn.addEventListener('click', sendInGameChatMessage);
+    DOMElements.inGameChatInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+            sendInGameChatMessage();
+        }
+    });
+    
+    DOMElements.muteBtn.addEventListener('click', toggleMute);
 
     DOMElements.bindUpBtn.addEventListener('click', () => listenForKeybind('ArrowUp', DOMElements.bindUpBtn));
     DOMElements.bindDownBtn.addEventListener('click', () => listenForKeybind('ArrowDown', DOMElements.bindDownBtn));
@@ -771,10 +811,20 @@ function populatePlayerListModal() {
 
 function initializeHub() {
     DOMElements.hubView.classList.remove('hidden');
+    DOMElements.hubBackgroundGlyphs.classList.remove('hidden');
+    DOMElements.hubClock.classList.remove('hidden');
+
+    DOMElements.newsContainer.classList.remove('hidden');
     DOMElements.newsContainer.classList.remove('anim-pop-out');
     DOMElements.newsContainer.classList.add('anim-pop-in');
+
     DOMElements.lobbyPlayerBar.style.display = 'flex';
+    DOMElements.toggleHubBtn.classList.add('hidden');
+
+    startClock();
+    createHubGlyphs();
     connectToLobby();
+    playHubMusic();
 }
 
 function handleNameSaveAndInitHub() {
@@ -784,25 +834,76 @@ function handleNameSaveAndInitHub() {
     }
 }
 
+function startClock() {
+    if (clockInterval) clearInterval(clockInterval);
+
+    function updateClock() {
+        const now = new Date();
+        const timeString = now.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+        const dayString = now.toLocaleDateString('en-US', { weekday: 'long' });
+        DOMElements.hubClock.innerHTML = `<div class="time">${timeString}</div><div class="day">${dayString}</div>`;
+    }
+
+    updateClock();
+    clockInterval = setInterval(updateClock, 1000);
+}
+
+function createHubGlyphs() {
+    const container = DOMElements.hubBackgroundGlyphs;
+    if (!container) return;
+    container.innerHTML = ''; // Clear existing glyphs
+    const glyphCount = 30;
+    const arrowKeys = Object.keys(ARROW_SVG);
+    const colors = [currentSettings.colors.up, currentSettings.colors.down, currentSettings.colors.left, currentSettings.colors.right];
+
+    for (let i = 0; i < glyphCount; i++) {
+        const glyph = document.createElement('div');
+        glyph.className = 'hub-glyph';
+
+        const randomArrowKey = arrowKeys[Math.floor(Math.random() * arrowKeys.length)];
+        glyph.innerHTML = ARROW_SVG[randomArrowKey];
+
+        const size = Math.random() * 80 + 40; // size between 40px and 120px
+        glyph.style.width = `${size}px`;
+        glyph.style.height = `${size}px`;
+
+        glyph.style.left = `${Math.random() * 100}vw`;
+
+        const duration = Math.random() * 20 + 15; // duration between 15s and 35s
+        const delay = Math.random() * 15; // delay up to 15s
+
+        glyph.style.animationDuration = `${duration}s`;
+        glyph.style.animationDelay = `-${delay}s`; // Use negative delay to start animations at different points
+
+        const randomColor = colors[Math.floor(Math.random() * colors.length)];
+        const bg = glyph.querySelector('.arrow-bg');
+        if (bg) {
+            bg.style.fill = randomColor;
+        }
+
+        container.appendChild(glyph);
+    }
+}
+
 function connectToLobby() {
     if (peer && !peer.destroyed) peer.destroy();
     peer = new Peer();
 
     peer.on('open', (id) => {
         console.log('My lobby peer ID is: ' + id);
-        
+
         peer.on('connection', (newConn) => {
             setupDirectLobbyConnection(newConn);
         });
 
         const hostConn = peer.connect(LOBBY_HOST_ID);
-        
+
         hostConn.on('open', () => {
             console.log("Connection to Lobby Host opened.");
             gameState.isLobbyHost = false;
             peerConnections.set(LOBBY_HOST_ID, hostConn);
             setupDirectLobbyConnection(hostConn);
-            
+
             const playerData = loadPlayerData();
             const selfData = { peerId: peer.id, name: currentSettings.playerName, level: playerData.highestWave };
             hostConn.send({ type: 'request_join_lobby', player: selfData });
@@ -826,16 +927,16 @@ function connectToLobby() {
 function becomeLobbyHost() {
     if (peer && !peer.destroyed) peer.destroy();
     peer = new Peer(LOBBY_HOST_ID);
-    
+
     peer.on('open', (id) => {
         console.log("Successfully became the Lobby Host with ID:", id);
         gameState.isLobbyHost = true;
-        
+
         const playerData = loadPlayerData();
         const selfData = { peerId: peer.id, name: currentSettings.playerName, level: playerData.highestWave };
         gameState.lobbyPlayers.set(peer.id, selfData);
         renderPlayerCards();
-        
+
         peer.on('connection', (newConn) => {
             setupDirectLobbyConnection(newConn);
         });
@@ -875,7 +976,7 @@ function handleLobbyData(data, senderId) {
                 type: 'lobby_state',
                 players: Array.from(gameState.lobbyPlayers.values())
             });
-            
+
             gameState.lobbyPlayers.set(newPlayer.peerId, newPlayer);
             broadcastToLobby({ type: 'new_player_joined', player: newPlayer }, newPlayer.peerId);
             renderPlayerCards();
@@ -935,14 +1036,14 @@ function sendHubChatMessage() {
     const message = input.value.trim();
     if (message === '' || !peer || !peer.id) return;
 
-    addPersonaChatMessage(currentSettings.playerName, message); 
-    
-    broadcastToLobby({ 
-        type: 'lobby_chat', 
+    addPersonaChatMessage(currentSettings.playerName, message);
+
+    broadcastToLobby({
+        type: 'lobby_chat',
         message: message,
-        senderName: currentSettings.playerName 
+        senderName: currentSettings.playerName
     });
-    
+
     input.value = '';
 }
 
@@ -987,7 +1088,8 @@ function onStartGameClick() {
     gameState.bossMode = DOMElements.bossModeToggle.checked;
     gameState.videoUrl = DOMElements.videoUrlInput.value.trim();
     gameState.isHost = true; // Set player as host for ALL game modes they initiate.
-    
+    stopHubMusic();
+
     if (gameState.mode === 'solo') {
         localPlayer = new Player(1, currentSettings.playerName, null, true);
         const playerData = loadPlayerData();
@@ -1005,7 +1107,7 @@ function onStartGameClick() {
             alert("Please enter a room name to create a multiplayer game.");
             return;
         }
-        
+
         if (peer) peer.destroy(); // Disconnect from lobby
         peer = new Peer(roomName);
 
@@ -1013,7 +1115,7 @@ function onStartGameClick() {
             console.log('Game room created with ID:', id);
             DOMElements.lobbyText.textContent = `Waiting for player... \n Room: ${id}`;
             DOMElements.lobbyOverlay.classList.remove('hidden');
-            
+
             localPlayer = new Player(1, currentSettings.playerName, peer.id, true);
             const playerData = loadPlayerData();
             localPlayer.updateLevel(playerData.highestWave);
@@ -1054,13 +1156,14 @@ function onJoinGameClick() {
     }
 
     gameState.isHost = false;
+    stopHubMusic();
     if (peer) peer.destroy(); // Disconnect from lobby
     peer = new Peer();
 
     peer.on('open', (id) => {
         console.log('My peer ID for joining is:', id);
         const playerData = loadPlayerData();
-        
+
         conn = peer.connect(roomName, {
             metadata: { name: currentSettings.playerName, level: playerData.highestWave }
         });
@@ -1084,6 +1187,50 @@ function onJoinGameClick() {
     });
 }
 
+function sendSyncData() {
+    if (gameState.mode !== 'multi' || !conn || !conn.open) return;
+    const syncData = {
+        type: 'player_sync',
+        sequence: localPlayer.currentSequence,
+        combo: localPlayer.combo,
+        isFever: localPlayer.combo >= 15,
+    };
+    sendData(syncData);
+}
+
+function sendInGameChatMessage() {
+    const input = DOMElements.inGameChatInput;
+    const message = input.value.trim();
+    if (message === '' || gameState.mode !== 'multi' || !conn || !conn.open) return;
+    
+    const chatData = { type: 'in_game_chat', message: message };
+    sendData(chatData);
+    showChatBubble(message, true); // Show my own message
+    input.value = '';
+}
+
+function showChatBubble(message, isLocal) {
+    const bubble = document.createElement('div');
+    bubble.className = 'chat-bubble';
+    
+    let container;
+    if (isLocal) {
+        bubble.classList.add('local');
+        container = localPlayer.dom.chatBubbleContainer;
+    } else {
+        bubble.classList.add('remote');
+        container = remotePlayer.dom.chatBubbleContainer;
+    }
+    
+    bubble.textContent = message;
+    container.appendChild(bubble);
+
+    setTimeout(() => {
+        bubble.remove();
+    }, 5000);
+}
+
+
 function setupInGameConnection() {
     conn.on('data', (data) => {
         // This is for IN-GAME communication only
@@ -1093,6 +1240,7 @@ function setupInGameConnection() {
                 gameState.videoUrl = data.gameState.videoUrl;
                 remotePlayer = new Player(1, data.hostData.name, conn.peer, false);
                 remotePlayer.updateLevel(data.hostData.level);
+                DOMElements.inGameChatBar.classList.remove('hidden');
                 startCountdown();
                 break;
             case 'rematch_request':
@@ -1108,9 +1256,6 @@ function setupInGameConnection() {
             case 'start_rematch':
                 restartMatch();
                 break;
-            case 'key_press_update':
-                handleRemoteKeyPress(data.progress);
-                break;
             case 'failure_update':
                 if (remotePlayer) {
                     remotePlayer.updateLives(data.lives);
@@ -1125,11 +1270,34 @@ function setupInGameConnection() {
                 DOMElements.videoUrlInput.value = data.url;
                 setVideoBackground();
                 break;
-            case 'new_sequence':
-                 if (remotePlayer) remotePlayer.startNewSequence(data.sequence);
+            case 'set_sequence':
+                if (!gameState.isHost && localPlayer) {
+                    localPlayer.startNewSequence(data.sequence);
+                    sendSyncData();
+                }
+                break;
+            case 'player_sync':
+                if (remotePlayer) {
+                    remotePlayer.currentSequence = data.sequence;
+                    remotePlayer.displaySequence();
+                    remotePlayer.updateCombo(data.combo);
+                    remotePlayer.updateFeverState(data.isFever);
+                }
                 break;
             case 'player_state_update':
-                 if (remotePlayer) remotePlayer.isIdle = data.isIdle;
+                if (remotePlayer) {
+                    remotePlayer.isIdle = data.isIdle;
+                    if (gameState.isHost && remotePlayer.isIdle && gameState.pendingNextWave) {
+                        gameState.pendingNextWave = false; 
+
+                        if (gameState.isCrescendoWave) {
+                            showIntermissionScreen();
+                            sendData({type: 'show_intermission'});
+                        } else {
+                            startWave(gameState.currentWave + 1);
+                        }
+                    }
+                }
                 break;
             case 'boss_health_update':
                 if (!gameState.isHost) updateBossHealth(data.health);
@@ -1140,10 +1308,25 @@ function setupInGameConnection() {
             case 'damage_boss':
                 if(gameState.isHost) dealDamageToBoss(data.damageType === 'heavy' ? 25 : 5, remotePlayer, data.damageType === 'heavy');
                 break;
+            case 'wave_change':
+                if (!gameState.isHost) {
+                    startWave(data.wave, data.bossData);
+                }
+                break;
+            case 'show_intermission':
+                if (!gameState.isHost) {
+                    clearInterval(gameState.waveModeTimerId);
+                    showIntermissionScreen();
+                }
+                break;
+            case 'in_game_chat':
+                showChatBubble(data.message, false);
+                break;
         }
     });
     conn.on('close', () => {
         alert('Opponent has disconnected.');
+        DOMElements.inGameChatBar.classList.add('hidden');
         resetGameToHub();
     });
 }
@@ -1159,7 +1342,7 @@ function onRematchClick() {
     DOMElements.rematchBtn.textContent = "Waiting for Opponent...";
     DOMElements.rematchBtn.disabled = true;
     gameState.localPlayerWantsRematch = true;
-    
+
     if (gameState.mode === 'multi') {
         sendData({ type: 'rematch_request' });
         if (gameState.remotePlayerWantsRematch) {
@@ -1175,7 +1358,10 @@ function onRematchClick() {
 
 function restartMatch() {
     DOMElements.gameOverScreen.classList.remove('visible');
-    
+    if (gameState.mode === 'multi') {
+        DOMElements.inGameChatBar.classList.remove('hidden');
+    }
+
     // Reset game state variables
     gameState.status = 'setup';
     gameState.isTransitioning = false;
@@ -1186,13 +1372,13 @@ function restartMatch() {
     gameState.isCrescendoWave = false;
     gameState.localPlayerWantsRematch = false;
     gameState.remotePlayerWantsRematch = false;
-    
+
     // --- Reset Arms Race effects ---
     gameState.enrageThreshold = 0.25;
     gameState.stumblePenalty = false;
     gameState.ambushActive = false;
     gameState.overwhelmActive = false;
-    
+
     [localPlayer, remotePlayer].forEach(p => {
         if (p) {
             p.maxLives = 3; // Reset max lives to default
@@ -1212,7 +1398,7 @@ function restartMatch() {
 
     DOMElements.rematchBtn.textContent = "Try Again";
     DOMElements.rematchBtn.disabled = false;
-    
+
     startCountdown();
 }
 
@@ -1240,7 +1426,7 @@ function showAnnouncement(element, text, duration) {
     });
 }
 
-async function startWave(waveNumber) {
+async function startWave(waveNumber, bossData = null) {
     if (waveNumber === 1 && gameState.bossMode) {
         startWaveModeTimer();
     }
@@ -1264,7 +1450,7 @@ async function startWave(waveNumber) {
     gameState.isCrescendoWave = gameState.currentWave % 3 === 0;
     DOMElements.bossArea.classList.remove('crescendo-intro');
 
-    initBoss(gameState.isCrescendoWave);
+    initBoss(gameState.isCrescendoWave, bossData);
 
     if (gameState.isCrescendoWave) {
         await showAnnouncement(DOMElements.warningEncounter, 'WARNING!!!', 2500);
@@ -1279,16 +1465,29 @@ async function startWave(waveNumber) {
         }
     }
     
-    localPlayer.startNewSequence();
-    if (remotePlayer && gameState.isHost) {
-        remotePlayer.startNewSequence(localPlayer.currentSequence);
+    if (gameState.isHost) {
+        localPlayer.startNewSequence();
+        sendSyncData();
+        if (remotePlayer) {
+            remotePlayer.currentSequence = localPlayer.currentSequence;
+            remotePlayer.displaySequence();
+            sendData({ type: 'set_sequence', sequence: localPlayer.currentSequence });
+        }
     }
-
 
     if (gameState.isHost && gameState.mode === 'multi') {
-        sendData({ type: 'wave_change', wave: waveNumber });
+        sendData({
+            type: 'wave_change',
+            wave: waveNumber,
+            bossData: {
+                name: gameState.bossName,
+                level: gameState.bossLevel,
+                element: gameState.bossElement,
+                maxHealth: gameState.bossMaxHealth
+            }
+        });
     }
-    
+
     gameState.isTransitioning = false;
 }
 
@@ -1313,8 +1512,10 @@ function startCountdown() {
             setTimeout(() => {
                 DOMElements.lobbyOverlay.classList.add('hidden');
                 setVideoBackground();
-                gameState.status = 'playing'; // FIX: Set game status to playing
-                
+                gameState.status = 'playing'; 
+                if (gameState.mode === 'multi') {
+                    DOMElements.inGameChatBar.classList.remove('hidden');
+                }
                 if (gameState.bossMode) {
                     DOMElements.waveModeTimer.classList.remove('hidden');
                     startWave(1);
@@ -1332,8 +1533,8 @@ function startCountdown() {
 
 function startWaveModeTimer() {
     clearInterval(gameState.waveModeTimerId);
-    gameState.waveModeTimeLeft = 355; 
-    updateWaveModeTimerDisplay(); 
+    gameState.waveModeTimeLeft = 355;
+    updateWaveModeTimerDisplay();
     gameState.waveModeTimerId = setInterval(updateWaveModeTimer, 1000);
 }
 
@@ -1360,7 +1561,7 @@ function updateWaveModeTimerDisplay() {
     }
 }
 
-function initBoss(isCrescendo) {
+function initBoss(isCrescendo, bossData = null) {
     DOMElements.bossArea.style.display = 'block';
     DOMElements.bossArea.classList.remove('enraged', 'boss-active', 'crescendo-intro');
     gameState.bossIsEnraged = false;
@@ -1375,16 +1576,26 @@ function initBoss(isCrescendo) {
     }
 
     const bossLevel = gameState.currentWave;
-    const bossNameList = isCrescendo ? MENACING_BOSS_NAMES : BOSS_NAMES;
-    
-    gameState.bossName = bossNameList[Math.floor(Math.random() * bossNameList.length)];
-    gameState.bossLevel = bossLevel;
-    gameState.bossElement = BOSS_ELEMENTS[Math.floor(Math.random() * BOSS_ELEMENTS.length)];
-    
-    const baseHealth = isCrescendo ? 300 : 150;
-    gameState.bossMaxHealth = baseHealth + (bossLevel * 25);
+
+    if (bossData) {
+        // If we received boss data, use it! (Client-side)
+        gameState.bossName = bossData.name;
+        gameState.bossLevel = bossData.level;
+        gameState.bossElement = bossData.element;
+        gameState.bossMaxHealth = bossData.maxHealth;
+    } else {
+        // Otherwise, generate a new boss (Host-side)
+        const bossNameList = isCrescendo ? MENACING_BOSS_NAMES : BOSS_NAMES;
+        gameState.bossName = bossNameList[Math.floor(Math.random() * bossNameList.length)];
+        gameState.bossLevel = bossLevel;
+        gameState.bossElement = BOSS_ELEMENTS[Math.floor(Math.random() * BOSS_ELEMENTS.length)];
+
+        const baseHealth = isCrescendo ? 300 : 150;
+        gameState.bossMaxHealth = baseHealth + (bossLevel * 25);
+    }
+
     gameState.bossCurrentHealth = gameState.bossMaxHealth;
-    
+
     DOMElements.bossName.textContent = gameState.bossName;
     DOMElements.bossLevel.textContent = `Lvl ${gameState.bossLevel}`;
     DOMElements.bossArea.classList.add(gameState.bossElement);
@@ -1394,7 +1605,7 @@ function initBoss(isCrescendo) {
 
 function hostCheckBossTrigger() {
     if (gameState.status !== 'playing' || !gameState.bossMode || gameState.isTransitioning) return;
-    
+
     gameState.sequenceTurnCounter++;
     const triggerInterval = gameState.bossIsEnraged ? 2 : 3;
     if(gameState.sequenceTurnCounter > 0 && gameState.sequenceTurnCounter % triggerInterval === 0) {
@@ -1403,19 +1614,22 @@ function hostCheckBossTrigger() {
 }
 
 function triggerBossAction() {
-    let availableActions = ["timer_burn", "blur", "stealth", "heal", "glyph_storm", "clockstopper"];
+    let availableActions = ["timer_burn", "blur", "stealth", "heal", "glyph_storm", "static_veil"];
     if (gameState.currentWave >= 4) {
         availableActions.push('stagger');
-        if (gameState.isCrescendoWave) {
-            availableActions.push('blur_stealth');
-        }
+    }
+    if (gameState.currentWave >= 7) {
+        availableActions.push('color_scramble');
+    }
+    if (gameState.isCrescendoWave) {
+        availableActions.push('blur_stealth');
     }
     if (gameState.bossCurrentHealth === gameState.bossMaxHealth) {
         availableActions = availableActions.filter(action => action !== 'heal');
     }
 
     const action = availableActions[Math.floor(Math.random() * availableActions.length)];
-    
+
     if (action === 'heal') {
         DOMElements.bossArea.classList.add('boss-healing');
         setTimeout(() => DOMElements.bossArea.classList.remove('boss-healing'), 1000);
@@ -1430,9 +1644,8 @@ function triggerBossAction() {
         DOMElements.bossArea.classList.add('boss-acting');
         setTimeout(() => DOMElements.bossArea.classList.remove('boss-acting'), 1000);
         
-        if (target.isLocal) {
-            applyBossAttack(action, target);
-        } else {
+        applyBossAttack(action, target);
+        if (!target.isLocal) {
             sendData({ type: 'boss_attack', attackType: action });
         }
     }
@@ -1485,54 +1698,68 @@ function createGlyphStorm(player) {
 
 function applyBossAttack(attackType, player) {
     if (!player) return;
-    
+
     showAttackAnnouncement(attackType, player);
     player.dom.playerArea.classList.add('shake');
     setTimeout(() => player.dom.playerArea.classList.remove('shake'), 500);
 
+    if (player.isLocal) {
+        switch(attackType) {
+            case 'timer_burn':
+                const burnAmount = gameState.bossIsEnraged ? 45 : 30;
+                const currentWidth = parseFloat(player.dom.timerBar.style.width) || 100;
+                player.dom.timerBar.style.width = `${Math.max(0, currentWidth - burnAmount)}%`;
+                break;
+            case 'blur':
+                player.dom.grid.classList.add('blurred');
+                setTimeout(() => player.dom.grid.classList.remove('blurred'), 3000);
+                break;
+            case 'stealth':
+                player.dom.sequenceContainer.classList.add('stealth');
+                break;
+            case 'stagger':
+                displaySequenceStaggered(player);
+                break;
+            case 'blur_stealth':
+                player.dom.grid.classList.add('blurred');
+                setTimeout(() => {
+                    player.dom.sequenceContainer.classList.add('stealth');
+                }, 1000);
+                break;
+            case 'color_scramble':
+                player.dom.sequenceContainer.classList.add('color-scramble');
+                setTimeout(() => {
+                    player.dom.sequenceContainer.classList.remove('color-scramble');
+                }, 6000);
+                break;
+        }
+    }
+
     switch(attackType) {
         case 'timer_burn':
-            const burnAmount = gameState.bossIsEnraged ? 45 : 30;
-            const currentWidth = parseFloat(player.dom.timerBar.style.width) || 100;
-            player.dom.timerBar.style.width = `${Math.max(0, currentWidth - burnAmount)}%`;
             const effectEl = player.dom[`timerEffect${gameState.bossElement.charAt(0).toUpperCase() + gameState.bossElement.slice(1)}`];
             if(effectEl) {
                 effectEl.classList.add('visible');
                 setTimeout(() => effectEl.classList.remove('visible'), 1000);
             }
             break;
-        case 'blur':
-            player.dom.grid.classList.add('blurred');
-            setTimeout(() => player.dom.grid.classList.remove('blurred'), 3000);
-            break;
-        case 'stealth':
-            player.dom.sequenceContainer.classList.add('stealth');
-            break;
-        case 'stagger':
-            displaySequenceStaggered(player);
-            break;
-        case 'blur_stealth':
-            player.dom.grid.classList.add('blurred');
-            setTimeout(() => {
-                player.dom.sequenceContainer.classList.add('stealth');
-            }, 1000);
-            break;
         case 'glyph_storm':
             createGlyphStorm(player);
             break;
-        case 'clockstopper':
-            const timerContainer = player.dom.timerBar.parentElement;
-            timerContainer.classList.add('timer-hidden');
+        case 'static_veil':
+            const veil = document.createElement('div');
+            veil.className = 'static-veil-effect';
+            player.dom.grid.appendChild(veil);
             setTimeout(() => {
-                timerContainer.classList.remove('timer-hidden');
-            }, 5000); // Hides for 5 seconds
+                veil.remove();
+            }, 4000);
             break;
     }
 }
 
 function displaySequenceStaggered(player) {
     const container = player.dom.sequenceContainer;
-    container.innerHTML = ''; 
+    container.innerHTML = '';
     const sequence = player.currentSequence;
     const revealDelay = 300;
 
@@ -1564,7 +1791,7 @@ function playDeathAnimation(isCrescendo) {
 
         setTimeout(() => {
             container.classList.remove('crescendo-defeated', 'defeated');
-            shards.forEach(shard => shard.style.background = ''); 
+            shards.forEach(shard => shard.style.background = '');
             resolve();
         }, duration);
     });
@@ -1572,10 +1799,9 @@ function playDeathAnimation(isCrescendo) {
 
 async function dealDamageToBoss(damage, player, isHeavyAttack = false) {
     if (gameState.status !== 'playing' || gameState.isTransitioning) return;
-    
-    // Apply Vulnerability Scan bonus damage
+
     if (player.hasVulnerabilityScan) {
-        damage *= 1.25; // 25% bonus damage
+        damage *= 1.25;
     }
 
     player.damageDealt += Math.round(damage);
@@ -1587,11 +1813,11 @@ async function dealDamageToBoss(damage, player, isHeavyAttack = false) {
 
     if (newHealth <= 0) {
         gameState.isTransitioning = true;
-        cancelAnimationFrame(localPlayer.timerId); 
+        cancelAnimationFrame(localPlayer.timerId);
         if(remotePlayer) cancelAnimationFrame(remotePlayer.timerId);
 
         await playDeathAnimation(gameState.isCrescendoWave);
-        
+
         if (remotePlayer && !remotePlayer.isIdle) {
             gameState.pendingNextWave = true;
             return;
@@ -1604,8 +1830,13 @@ async function dealDamageToBoss(damage, player, isHeavyAttack = false) {
         } else {
             startWave(gameState.currentWave + 1);
         }
-    } else if (player.isLocal) {
-        player.startNewSequence();
+    } else {
+        player.startNewSequence(); 
+        if (player.isLocal) {
+            sendSyncData();
+        } else {
+            sendData({ type: 'set_sequence', sequence: player.currentSequence });
+        }
     }
 }
 
@@ -1659,8 +1890,8 @@ function showIntermissionScreen() {
 
 function generatePowerUps() {
     const allPowerUps = [
-        { 
-            title: 'Reinforce', 
+        {
+            title: 'Reinforce',
             desc: 'YOU: Max lives +1. <br>THEY: Boss enrages sooner.',
             badge: '❤️‍🔥',
             effect: () => {
@@ -1669,17 +1900,17 @@ function generatePowerUps() {
                 gameState.enrageThreshold = Math.min(0.75, gameState.enrageThreshold + 0.15); // Cap at 75%
             }
         },
-        { 
-            title: 'Sequence Flow', 
+        {
+            title: 'Sequence Flow',
             desc: 'YOU: Gain more time per sequence. <br>THEY: Failing a sequence is more punishing.',
             badge: '🌊',
-            effect: () => { 
+            effect: () => {
                 localPlayer.hasSequenceFlow = true;
                 gameState.stumblePenalty = true;
             }
         },
-        { 
-            title: 'Vulnerability Scan', 
+        {
+            title: 'Vulnerability Scan',
             desc: 'YOU: Deal 25% bonus damage. <br>THEY: Boss may attack mid-sequence.',
             badge: '🎯',
             effect: () => {
@@ -1773,14 +2004,14 @@ function continueRun() {
     DOMElements.intermissionStatusText.classList.remove('hidden');
     DOMElements.powerUpOptions.classList.remove('hidden');
     DOMElements.readyUpBtn.classList.remove('hidden');
-    
+
     if (chosenPowerUpEffect && chosenPowerUpEffect.effect) {
         chosenPowerUpEffect.effect();
     }
-    
+
     startWaveModeTimer();
     startWave(gameState.currentWave + 1);
-    
+
     chosenPowerUpEffect = null;
 }
 
@@ -1795,22 +2026,32 @@ function updateBadge(playerId, badge) {
 // --- Core Game Logic ---
 function transitionToGameArea() {
     DOMElements.hubView.classList.add('hidden');
+    DOMElements.hubBackgroundGlyphs.classList.add('hidden');
+    DOMElements.hubClock.classList.add('hidden');
+    DOMElements.toggleHubBtn.classList.add('hidden');
     DOMElements.gameSetupModal.classList.add('hidden');
     DOMElements.lobbyPlayerBar.style.display = 'none';
+
+    if(clockInterval) clearInterval(clockInterval);
+
     DOMElements.gameArea.classList.remove('hidden');
     DOMElements.gameArea.style.display = 'flex';
 }
 
 function handleKeyPress(e) {
-    if (gameState.status !== 'playing' || titleScreenActive) return;
+    if ((gameState.status !== 'playing' && gameState.status !== 'gameover') || titleScreenActive) return;
 
-    if (document.activeElement === DOMElements.hubChatInput || document.activeElement === DOMElements.roomNameInput) return;
+    if (document.activeElement === DOMElements.hubChatInput || 
+        document.activeElement === DOMElements.roomNameInput ||
+        document.activeElement === DOMElements.inGameChatInput) {
+        return;
+    }
 
     const pressedKey = e.key;
     const action = Object.keys(currentSettings.keyBinds).find(act => currentSettings.keyBinds[act] === pressedKey);
 
     if (!action) return;
-    
+
     e.preventDefault();
     const player = localPlayer;
     if (!player || !player.currentSequence || player.currentSequence.length === 0) return;
@@ -1825,39 +2066,33 @@ function handleKeyPress(e) {
 function handleCorrectKeyPress(player) {
     const arrowEl = player.dom.sequenceContainer.children[player.sequenceProgress];
     if (arrowEl) arrowEl.classList.add('correct');
-    
-    if (gameState.ambushActive && player.isLocal && gameState.isHost && player.sequenceProgress > 0 && Math.random() < 0.1) { 
+
+    if (gameState.ambushActive && player.isLocal && gameState.isHost && player.sequenceProgress > 0 && Math.random() < 0.1) {
         triggerBossAction();
     }
-    
-    player.sequenceProgress++;
 
-    if (gameState.mode === 'multi') {
-        sendData({ type: 'key_press_update', progress: player.sequenceProgress });
-    }
+    player.sequenceProgress++;
 
     if (player.sequenceProgress === player.currentSequence.length) {
         player.successfulSequences++;
         player.updateCombo(player.combo + 1);
         player.dom.grid.classList.add('success-glow');
         setTimeout(() => player.dom.grid.classList.remove('success-glow'), 500);
-        
+
         player.isIdle = true;
+        player.currentSequence = []; 
         if(player.isLocal && gameState.mode === 'multi') {
             sendData({ type: 'player_state_update', isIdle: player.isIdle });
+            sendSyncData();
         }
 
         if (gameState.bossMode) {
             cancelAnimationFrame(player.timerId);
-            const damageType = 'regular';
             if (gameState.isHost) {
                 dealDamageToBoss(10, player, false);
                 hostCheckBossTrigger();
             } else {
-                 sendData({ type: 'damage_boss', damageType: damageType });
-                if (!gameState.pendingNextWave) {
-                    player.startNewSequence();
-                }
+                 sendData({ type: 'damage_boss', damageType: 'regular' });
             }
         } else {
             setTimeout(() => player.startNewSequence(), 300);
@@ -1868,20 +2103,24 @@ function handleCorrectKeyPress(player) {
 function handleFailure(player) {
     if (player.isLocal && player.activePlates > 0) {
         player.activePlates--;
-        player.dom.grid.classList.add('success-glow'); 
+        player.dom.grid.classList.add('success-glow');
         setTimeout(() => player.dom.grid.classList.remove('success-glow'), 500);
         player.startNewSequence();
+        if (player.isLocal) {
+            sendSyncData();
+        }
         return;
     }
 
-    gameState.lastFailer = player.peerId; 
+    gameState.lastFailer = player.peerId;
     player.lives--;
     player.updateLives(player.lives);
     player.updateCombo(0);
-    
+
     player.isIdle = true;
     if(player.isLocal && gameState.mode === 'multi') {
         sendData({ type: 'player_state_update', isIdle: player.isIdle });
+        sendSyncData();
     }
 
     player.dom.grid.classList.add('fail-flash');
@@ -1903,39 +2142,45 @@ function handleFailure(player) {
         setTimeout(() => {
             if (!gameState.pendingNextWave) {
                 player.startNewSequence();
+                if (player.isLocal) {
+                    sendSyncData();
+                }
             }
         }, 300);
     }
 }
 
-function handleRemoteKeyPress(progress) {
-    if (!remotePlayer) return;
-    remotePlayer.sequenceProgress = progress;
-    const arrowEl = remotePlayer.dom.sequenceContainer.children[progress - 1];
-    if (arrowEl) arrowEl.classList.add('correct');
-}
-
 function resetGameToHub() {
     DOMElements.gameOverScreen.classList.remove('visible');
     DOMElements.intermissionScreen.classList.remove('visible');
-
     DOMElements.gameArea.classList.add('hidden');
+    DOMElements.inGameChatBar.classList.add('hidden');
+
+    // Show all hub elements again
     DOMElements.hubView.classList.remove('hidden');
     DOMElements.lobbyPlayerBar.style.display = 'flex';
-    
+    DOMElements.hubClock.classList.remove('hidden');
+    DOMElements.hubBackgroundGlyphs.classList.remove('hidden');
+
+    startClock();
+    playHubMusic();
+
     if (conn) conn.close();
     if (peer) peer.destroy();
-    
+
     localPlayer = null;
     remotePlayer = null;
-    
+
     connectToLobby();
 }
 
 function gameOver(winnerName) {
     if (gameState.status === 'gameover') return;
     gameState.status = 'gameover';
-    
+    if (gameState.mode === 'multi') {
+        DOMElements.inGameChatBar.classList.remove('hidden');
+    }
+
     clearInterval(gameState.waveModeTimerId);
 
     const playerData = loadPlayerData();
@@ -1946,13 +2191,13 @@ function gameOver(winnerName) {
     playerData.highestWave = Math.max(playerData.highestWave || 0, gameState.currentWave -1);
     savePlayerData(playerData);
 
-    [localPlayer, remotePlayer].forEach(p => { 
+    [localPlayer, remotePlayer].forEach(p => {
         if(p) cancelAnimationFrame(p.timerId);
     });
 
     const titleEl = DOMElements.gameOverTitle;
     titleEl.innerHTML = '';
-    
+
     const titleText = gameState.bossMode ? 'RUN COMPLETE' : 'GAME OVER';
 
     titleText.split('').forEach((char, index) => {
@@ -1969,7 +2214,7 @@ function gameOver(winnerName) {
     } else {
         DOMElements.winnerNameDisplay.style.display = 'none';
     }
-    
+
     DOMElements.statsCombo.textContent = localPlayer.highestCombo;
     DOMElements.statsCleared.textContent = localPlayer.successfulSequences;
     if (gameState.bossMode) {
@@ -1978,7 +2223,7 @@ function gameOver(winnerName) {
     } else {
         DOMElements.damageStatContainer.style.display = 'none';
     }
-    
+
     DOMElements.gameOverScreen.classList.add('visible');
 }
 
@@ -2071,5 +2316,70 @@ function setVideoBackground() {
 
     DOMElements.videoWallContainer.insertAdjacentHTML('beforeend', '<div class="overlay"></div>');
 }
+
+// --- Music Controls ---
+function playHubMusic() {
+    if (!hubMusic) {
+        hubMusic = new Audio('http://sonostra.com/lobby.mp3');
+        hubMusic.loop = true;
+    }
+    
+    if (currentSettings.musicMuted) {
+        hubMusic.volume = 0;
+    } else {
+        hubMusic.volume = 0;
+        hubMusic.play();
+        fadeAudio(hubMusic, 0.5, 2000);
+    }
+}
+
+function stopHubMusic() {
+    if (hubMusic) {
+        fadeAudio(hubMusic, 0, 1000).then(() => {
+            hubMusic.pause();
+        });
+    }
+}
+
+function toggleMute() {
+    currentSettings.musicMuted = !currentSettings.musicMuted;
+    saveSettings(); // Save the mute state
+    if (currentSettings.musicMuted) {
+        fadeAudio(hubMusic, 0, 500);
+    } else {
+        fadeAudio(hubMusic, 0.5, 500);
+    }
+    updateMuteIcon();
+}
+
+function updateMuteIcon() {
+    if (currentSettings.musicMuted) {
+        DOMElements.mutedIcon.classList.remove('hidden');
+        DOMElements.unmutedIcon.classList.add('hidden');
+    } else {
+        DOMElements.mutedIcon.classList.add('hidden');
+        DOMElements.unmutedIcon.classList.remove('hidden');
+    }
+}
+
+function fadeAudio(audio, targetVolume, duration) {
+    return new Promise(resolve => {
+        const startVolume = audio.volume;
+        const startTime = Date.now();
+
+        function updateVolume() {
+            const elapsedTime = Date.now() - startTime;
+            if (elapsedTime < duration) {
+                audio.volume = startVolume + (targetVolume - startVolume) * (elapsedTime / duration);
+                requestAnimationFrame(updateVolume);
+            } else {
+                audio.volume = targetVolume;
+                resolve();
+            }
+        }
+        requestAnimationFrame(updateVolume);
+    });
+}
+
 
 init();

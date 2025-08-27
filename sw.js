@@ -8,7 +8,6 @@ const CACHE_NAME = 'sonostra-v6';
 const FILES_TO_CACHE = [
   '/',
   'index.html',
-  'leveleditor.html',
   'style.css',
   'gear.css',
   'sonastra-map.css',
@@ -88,3 +87,4 @@ self.addEventListener('fetch', (evt) => {
       })
   );
 });
+

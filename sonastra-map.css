@@ -1,0 +1,128 @@
+/*
+ * SONASTRA MAP STYLES
+ * This file contains all CSS related to the Sonastra hexagon challenge map.
+ */
+
+:root {
+    /* Updated to use viewport width for responsive scaling */
+    --hex-size: 18vw; /* Base size on viewport width */
+    --hex-gap: 0.5vw;   /* Scale gap with viewport width */
+    --map-glow-color: rgba(3, 169, 244, 0.7);
+}
+
+#sonastra-map-container {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1; /* Sits below the news panel but above the background */
+    padding: 2rem;
+    overflow: hidden;
+}
+
+.sonastra-grid {
+    display: flex; /* Switched to flexbox for better centering and wrapping */
+    flex-wrap: wrap; /* Allow hexagons to wrap to the next line */
+    justify-content: center; /* Center the hexagons */
+    align-items: center;
+    width: 95vw; /* Max width to keep it contained */
+    max-width: 800px; /* Max width on larger screens */
+    gap: var(--hex-gap);
+    list-style-type: none;
+    padding: 0;
+    margin: 0;
+}
+
+.hexagon-wrapper {
+    width: var(--hex-size);
+    height: calc(var(--hex-size) * 1.1547); /* Maintain aspect ratio */
+    position: relative;
+    flex-shrink: 0; /* Prevent hexagons from shrinking */
+}
+
+.hexagon {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: #333;
+    clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    flex-direction: column;
+    font-family: var(--font-display);
+    transition: all 0.3s ease-in-out;
+}
+
+.hexagon .level-text {
+    font-size: calc(var(--hex-size) * 0.2); /* Scale font size with hex size */
+    font-weight: 900;
+    color: white;
+    z-index: 2;
+}
+
+.hexagon .padlock {
+    font-size: calc(var(--hex-size) * 0.25); /* Scale padlock size */
+    position: absolute;
+    z-index: 1;
+    opacity: 1;
+    transition: opacity 0.3s ease;
+}
+
+/* --- STATES --- */
+
+/* LOCKED STATE */
+.hexagon.locked {
+    background: linear-gradient(45deg, #222, #444);
+    cursor: not-allowed;
+    filter: grayscale(80%);
+}
+
+.hexagon.locked .level-text {
+    opacity: 0.2;
+}
+
+/* UNLOCKED STATE */
+.hexagon.unlocked {
+    background: linear-gradient(45deg, var(--primary-color), var(--secondary-color));
+    cursor: pointer;
+    filter: grayscale(0%);
+    box-shadow: 0 0 15px var(--map-glow-color);
+}
+
+.hexagon.unlocked:hover {
+    transform: scale(1.1);
+    z-index: 10;
+    box-shadow: 0 0 30px var(--map-glow-color);
+}
+
+.hexagon.unlocked .padlock {
+    opacity: 0;
+}
+
+/* COMPLETED STATE (Future) */
+.hexagon.completed {
+    background: linear-gradient(45deg, var(--success-color), #FFD700);
+    box-shadow: 0 0 20px var(--success-color);
+    cursor: pointer;
+}
+
+.hexagon.completed:hover {
+    transform: scale(1.05);
+}
+
+.hexagon.completed .padlock {
+    display: none;
+}
+
+/* --- Mobile Scaling --- */
+@media (min-width: 768px) {
+    :root {
+        --hex-size: 100px; /* Larger, fixed size for tablets and desktops */
+        --hex-gap: 4px;
+    }
+}

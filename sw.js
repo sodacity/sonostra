@@ -1,4 +1,4 @@
-const CACHE_NAME = 'sonostra-v2';
+const CACHE_NAME = 'sonostra-v6';
 const urlsToCache = [
   '/',
   '/index.html',
@@ -28,5 +28,6 @@ self.addEventListener('fetch', event => {
     )
   );
 });
+
 
 
